@@ -5,6 +5,33 @@ use crate::client::NextcloudClient;
 use crate::error::Result;
 
 #[derive(Debug, Clone)]
+pub struct AppPasswordClient {
+    client: NextcloudClient,
+}
+
+impl AppPasswordClient {
+    pub fn new(client: NextcloudClient) -> Self {
+        Self { client }
+    }
+
+    pub async fn create_app_password(&self) -> Result<AppPasswordCredentials> {
+        let response: OcsAppPasswordEnvelope = self
+            .client
+            .get_ocs_json("ocs/v2.php/core/getapppassword?format=json")
+            .await?;
+        Ok(AppPasswordCredentials {
+            app_password: response.ocs.data.app_password,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AppPasswordCredentials {
+    #[serde(rename = "appPassword", alias = "apppassword")]
+    pub app_password: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct LoginFlowV2Client {
     client: NextcloudClient,
 }
@@ -49,6 +76,22 @@ pub struct LoginFlowV2Credentials {
     pub app_password: String,
 }
 
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+struct OcsAppPasswordEnvelope {
+    ocs: OcsAppPasswordBody,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+struct OcsAppPasswordBody {
+    data: OcsAppPasswordData,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+struct OcsAppPasswordData {
+    #[serde(rename = "apppassword")]
+    app_password: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,6 +127,27 @@ mod tests {
             serde_json::from_str(raw).expect("valid credentials JSON");
         assert_eq!(parsed.login_name, "nicholai");
         assert_eq!(parsed.app_password, "secret");
+        Ok(())
+    }
+
+    #[test]
+    fn parses_ocs_app_password_response() -> Result<()> {
+        let raw = r#"{
+            "ocs": {
+                "meta": {
+                    "status": "ok",
+                    "statuscode": 200,
+                    "message": "OK"
+                },
+                "data": {
+                    "apppassword": "generated-secret"
+                }
+            }
+        }"#;
+
+        let parsed: OcsAppPasswordEnvelope =
+            serde_json::from_str(raw).expect("valid OCS app password JSON");
+        assert_eq!(parsed.ocs.data.app_password, "generated-secret");
         Ok(())
     }
 }

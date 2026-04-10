@@ -17,6 +17,14 @@ cargo run -p nextcloud-cli -- auth login \
   --profile personal \
   --no-open
 
+read -rsp "Nextcloud password: " NC_PASSWORD; echo
+printf '%s' "$NC_PASSWORD" | cargo run -p nextcloud-cli -- auth app-password \
+  --server https://cloud.example.com \
+  --user you \
+  --profile personal \
+  --password-stdin
+unset NC_PASSWORD
+
 NEXTCLOUD_APP_PASSWORD=... cargo run -p nextcloud-cli -- auth add \
   --server https://cloud.example.com \
   --user you \

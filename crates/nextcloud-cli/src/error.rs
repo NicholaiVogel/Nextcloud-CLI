@@ -10,6 +10,15 @@ pub enum CliError {
     #[error("app password is required; pass --app-password or set NEXTCLOUD_APP_PASSWORD")]
     MissingAppPassword,
 
+    #[error("account password is required; pass --password-stdin or --password-env <NAME>")]
+    MissingAccountPassword,
+
+    #[error("password environment variable {name} is not set")]
+    PasswordEnvMissing { name: String },
+
+    #[error("failed to read account password from stdin: {0}")]
+    PasswordStdinRead(#[source] std::io::Error),
+
     #[error("failed to read credentials from {path}: {source}")]
     CredentialRead {
         path: PathBuf,
@@ -70,6 +79,9 @@ impl CliError {
         match self {
             Self::Core(error) => error.code(),
             Self::MissingAppPassword => "missing_app_password",
+            Self::MissingAccountPassword => "missing_account_password",
+            Self::PasswordEnvMissing { .. } => "password_env_missing",
+            Self::PasswordStdinRead(_) => "password_stdin_read_failed",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
             Self::CredentialParse { .. } => "credential_parse_failed",
@@ -89,6 +101,8 @@ impl CliError {
             Self::Core(nextcloud::Error::ProfileNotFound { .. }) => 2,
             Self::Core(nextcloud::Error::CredentialNotFound { .. }) => 2,
             Self::MissingAppPassword => 2,
+            Self::MissingAccountPassword => 2,
+            Self::PasswordEnvMissing { .. } => 2,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,
             Self::Core(nextcloud::Error::Http(_)) => 3,

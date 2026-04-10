@@ -944,6 +944,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "webbrowser",
+ "zeroize",
 ]
 
 [[package]]

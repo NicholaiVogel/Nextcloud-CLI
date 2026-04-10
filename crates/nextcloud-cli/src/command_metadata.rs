@@ -41,6 +41,11 @@ pub fn command_schema() -> CommandSchema {
                 "AuthLoginResult",
             ),
             stable(
+                "auth app-password",
+                "Create and store a Nextcloud app password from headless account-password auth.",
+                "AuthAppPasswordResult",
+            ),
+            stable(
                 "auth add",
                 "Add an app-password authenticated profile.",
                 "AuthAddResult",

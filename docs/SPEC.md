@@ -50,10 +50,11 @@ Completed so far:
 - Config directory resolution with `NEXTCLOUD_CLI_CONFIG_DIR` and `--config-dir`.
 - Profile config schema with schema version, default profile, server, username,
   credential reference, and safe default policy fields.
-- Credential backend abstraction with an initial local file backend storing app
-  passwords outside `config.json` with owner-only file permissions on Unix.
+- Credential backend abstraction with `keyring-auto`, OS keyring storage, and an
+  owner-only local file fallback for headless environments.
 - Login Flow v2 setup through `auth login`, including `--no-open` for headless
-  use.
+  use where another machine can approve the printed URL.
+- Fully headless app-password minting through `auth app-password --password-stdin`.
 - Manual app-password setup through `auth add`.
 - `auth status`, `profiles list`, `profiles show`, and `profiles set-default`.
 - `server status` through `status.php`.
@@ -81,11 +82,13 @@ Real-server smoke started against `https://nextcloud.biohazardvfx.com`:
 
 - `status.php` succeeded and reported Nextcloud `29.0.1`.
 - Login Flow v2 start succeeded and produced an approval URL.
-- Authenticated smoke is still pending browser approval.
+- Authenticated smoke is still pending headless app-password setup or browser
+  approval from another machine.
 
 Important pending items before MVP:
 
-- Complete real-server Login Flow v2 approval smoke.
+- Complete real-server authenticated smoke with `auth app-password --password-stdin`
+  or Login Flow v2 approval from another machine.
 - OS keyring backend validation on target desktop/server platforms.
 - Broader real-server smoke validation across auth, capabilities, and files.
 - Mock HTTP tests for WebDAV and OCS commands.
@@ -565,7 +568,7 @@ The `nxc` alias must behave identically to `nextcloud-cli`.
 | `NEXTCLOUD_URL` | Server URL for env-based auth. |
 | `NEXTCLOUD_USER` | Username or login name for env-based auth. |
 | `NEXTCLOUD_APP_PASSWORD` | App password for env-based auth. |
-| `NEXTCLOUD_CLI_KEYRING_BACKEND` | `keyring` or `file`. Defaults to `keyring`. |
+| `NEXTCLOUD_CLI_KEYRING_BACKEND` | `keyring`, `file`, or unset for `keyring-auto` with local-file fallback. |
 | `NEXTCLOUD_CLI_LOG` | Log level for diagnostics. |
 | `NEXTCLOUD_CLI_LOG_FILE` | Optional directory for JSON logs. |
 | `NEXTCLOUD_CLI_AGENT_MODE` | When `1` or `true`, apply agent-mode defaults for the selected profile. |
@@ -658,7 +661,7 @@ metadata, help output, tests, and release gates like every other public command.
 
 ### 7.6 Implemented command surface
 
-Implemented as of commit `8d3139e`:
+Implemented in the current development spine:
 
 ```bash
 nextcloud-cli commands schema
@@ -666,6 +669,7 @@ nextcloud-cli config path
 nextcloud-cli config show
 nextcloud-cli config doctor
 nextcloud-cli auth login --server <url> --profile <name> --no-open
+nextcloud-cli auth app-password --server <url> --user <user> --profile <name> --password-stdin
 nextcloud-cli auth add --server <url> --user <user> --profile <name> --app-password <password>
 nextcloud-cli auth status
 nextcloud-cli profiles list
@@ -688,8 +692,9 @@ Implementation notes:
 - Global `--dry-run`, `--no-color`, `--quiet`, `--verbose`, `--ca-bundle`,
   `--insecure`, and `--agent` remain pending. `files mkdir` has command-local
   `--dry-run`.
-- `auth login` and `auth add` are implemented. `auth login` has `--no-open` for
-  headless use.
+- `auth login`, `auth app-password`, and `auth add` are implemented. `auth login`
+  has `--no-open` for SSH sessions where another browser can approve the printed
+  URL. `auth app-password --password-stdin` is the fully headless setup path.
 - Credential storage uses an abstraction with `keyring-auto`, an OS keyring backend,
   and a local owner-only file fallback for headless environments.
 - `server capabilities` uses a per-profile cache. `--refresh` bypasses and
@@ -865,7 +870,69 @@ Completion gate:
 - Real-server smoke test confirms login works.
 - Docs include browser and `--no-open` examples.
 
-### 9.2 `auth add`
+### 9.2 `auth app-password`
+
+Syntax:
+
+```bash
+nextcloud-cli auth app-password --server <url> --user <user> --password-stdin [--profile <name>]
+nextcloud-cli auth app-password --server <url> --user <user> --password-env <name> [--profile <name>]
+```
+
+Purpose:
+
+Create a Nextcloud app password from an account password without requiring a
+browser on the working machine. This is the SSH-friendly setup path.
+
+Backing API:
+
+- `GET /ocs/v2.php/core/getapppassword?format=json`
+
+Behavior:
+
+1. Normalize and validate the server URL.
+2. Read the account password from stdin when `--password-stdin` is passed, or
+   from the named environment variable when `--password-env` is passed.
+3. Authenticate to the OCS app-password endpoint with HTTP Basic auth.
+4. Read `ocs.data.apppassword` from the response.
+5. Store the returned app password in the credential backend.
+6. Do not print or persist the account password or generated app password in
+   normal command output.
+7. Upsert the profile and optionally make it the default.
+8. Print stored profile metadata as JSON.
+
+Expected output:
+
+```json
+{
+  "profile": "default",
+  "server": "https://cloud.example.com/",
+  "username": "nicholai",
+  "auth_type": "app_password",
+  "credential_backend": "keyring-auto",
+  "credential_stored": true,
+  "password_source": "stdin",
+  "cache_invalidated": false,
+  "default_profile": "default"
+}
+```
+
+Errors:
+
+- invalid server URL
+- no password source provided
+- password environment variable missing
+- account-password auth failed
+- app-password creation forbidden by server policy
+- app password could not be stored
+
+Completion gate:
+
+- Unit tests cover OCS app-password response parsing.
+- CLI smoke covers missing password source validation.
+- Real-server smoke confirms headless app-password setup.
+
+### 9.3 `auth add`
 
 Syntax:
 
@@ -904,7 +971,7 @@ Completion gate:
 - Secret does not appear in process logs, errors, or output.
 - Real-server smoke test confirms manual app password works.
 
-### 9.3 `auth status`
+### 9.4 `auth status`
 
 Syntax:
 
@@ -933,7 +1000,7 @@ Completion gate:
 
 - Test valid, missing, invalid, and expired/revoked credentials.
 
-### 9.4 `auth export`
+### 9.5 `auth export`
 
 Syntax:
 
@@ -956,7 +1023,7 @@ Completion gate:
 - Tests verify masked and unmasked behavior.
 - Unmasked export requires explicit flag.
 
-### 9.5 `auth logout`
+### 9.6 `auth logout`
 
 Syntax:
 
@@ -5024,18 +5091,21 @@ nextcloud-cli commands schema --format json
 
 ### 41.2 Phase 1: auth, profiles, and server detection
 
-Status: partial. Login Flow v2, manual app-password auth, profiles,
-`auth status`, `server status`, `server capabilities`, `NEXTCLOUD_CLI_PROFILE`,
-and capability caching are implemented. OS keyring storage and real-server smoke
-validation remain pending.
+Status: partial. Login Flow v2, headless app-password minting, manual
+app-password auth, profiles, `auth status`, `server status`,
+`server capabilities`, `NEXTCLOUD_CLI_PROFILE`, OS keyring storage, and
+capability caching are implemented. Real-server authenticated smoke validation
+remains pending.
 
 Deliverables:
 
 - Login Flow v2 auth: implemented through `auth login`; real-server smoke still
   pending
+- headless app-password auth: implemented through `auth app-password --password-stdin`;
+  real-server smoke still pending
 - manual app-password auth: implemented through `auth add`
-- secure credential storage abstraction: partial, abstraction, OS keyring backend, and local file fallback
-  implemented; target-platform keyring validation pending
+- secure credential storage abstraction: partial, abstraction, OS keyring backend,
+  and local file fallback implemented; target-platform keyring validation pending
 - profile selection and ambiguity handling: partial, `--profile`,
   `NEXTCLOUD_CLI_PROFILE`, and stored default profile implemented; multiple-profile
   ambiguity listing remains pending
@@ -5048,6 +5118,7 @@ Completion signal:
 
 ```bash
 nextcloud-cli auth login --server https://cloud.example.com
+nextcloud-cli auth app-password --server https://cloud.example.com --user you --password-stdin
 nextcloud-cli auth status --format json
 nextcloud-cli profiles list --format json
 nextcloud-cli server capabilities --format json

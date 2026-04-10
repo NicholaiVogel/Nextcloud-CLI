@@ -13,6 +13,7 @@ The current implementation covers the repository spine and the first auth/profil
 - `config show`
 - `config doctor`
 - `auth login`
+- `auth app-password`
 - `auth add`
 - `auth status`
 - `profiles list`

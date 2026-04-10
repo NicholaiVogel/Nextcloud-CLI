@@ -7,19 +7,21 @@ mod output;
 
 use chrono::Utc;
 use clap::Parser;
+use std::io::Read;
 use std::time::Duration;
 use tokio::time::{Instant, sleep};
+use zeroize::Zeroizing;
 
 use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
-    AuthCommand, Cli, Command, CommandsCommand, ConfigCommand, FilesCommand, ProfilesCommand,
-    ServerCommand, UpdateCommand,
+    AuthAppPasswordArgs, AuthCommand, Cli, Command, CommandsCommand, ConfigCommand, FilesCommand,
+    ProfilesCommand, ServerCommand, UpdateCommand,
 };
 use credential_store::CredentialStore;
 use error::{CliError, CliResult};
 use nextcloud::{
-    CapabilitiesClient, CliConfig, ConfigPaths, ConfigStore, LoginFlowV2Client, NextcloudClient,
-    Profile, ServerCapabilities, WebDavClient,
+    AppPasswordClient, CapabilitiesClient, CliConfig, ClientAuth, ConfigPaths, ConfigStore,
+    LoginFlowV2Client, NextcloudClient, Profile, ServerCapabilities, WebDavClient,
 };
 use output::{print_error, print_success};
 use serde::Serialize;
@@ -237,6 +239,49 @@ async fn handle_auth(
                 default_profile: config.default_profile,
             })
         }
+        AuthCommand::AppPassword(args) => {
+            let server = Profile::parse_server(&args.server)?;
+            let (account_password, password_source) = read_account_password(&args)?;
+            let client = NextcloudClient::new(
+                server.clone(),
+                Some(ClientAuth {
+                    username: args.user.clone(),
+                    app_password: account_password.to_string(),
+                }),
+            )?;
+            let app_password_client = AppPasswordClient::new(client);
+            let credentials = app_password_client.create_app_password().await?;
+
+            let profile_name = args
+                .profile
+                .clone()
+                .or_else(|| selected_profile.map(str::to_owned))
+                .unwrap_or_else(|| default_profile_name(&args.user, server.host_str()));
+            let profile = Profile::new(profile_name.clone(), server, args.user.clone());
+
+            credential_store.put_app_password(
+                &profile.credential,
+                &profile.username,
+                &credentials.app_password,
+            )?;
+
+            let mut config = store.load()?;
+            config.upsert_profile(profile.clone(), args.set_default);
+            store.save(&config)?;
+            let cache_invalidated = capability_cache.invalidate(&profile.name)?;
+
+            json_value(AuthAppPasswordOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                username: profile.username,
+                auth_type: "app_password".to_owned(),
+                credential_backend: credential_store.backend_name().to_owned(),
+                credential_stored: true,
+                password_source: password_source.to_owned(),
+                cache_invalidated,
+                default_profile: config.default_profile,
+            })
+        }
         AuthCommand::Add(args) => {
             let app_password = args.app_password.ok_or(CliError::MissingAppPassword)?;
             let server = Profile::parse_server(&args.server)?;
@@ -283,6 +328,34 @@ async fn handle_auth(
             })
         }
     }
+}
+
+fn read_account_password(
+    args: &AuthAppPasswordArgs,
+) -> CliResult<(Zeroizing<String>, &'static str)> {
+    if args.password_stdin {
+        let mut password = String::new();
+        std::io::stdin()
+            .read_to_string(&mut password)
+            .map_err(CliError::PasswordStdinRead)?;
+        let trimmed_len = password.trim_end_matches(&['\r', '\n'][..]).len();
+        password.truncate(trimmed_len);
+        if password.is_empty() {
+            return Err(CliError::MissingAccountPassword);
+        }
+        return Ok((Zeroizing::new(password), "stdin"));
+    }
+
+    if let Some(name) = &args.password_env {
+        let password =
+            std::env::var(name).map_err(|_| CliError::PasswordEnvMissing { name: name.clone() })?;
+        if password.is_empty() {
+            return Err(CliError::MissingAccountPassword);
+        }
+        return Ok((Zeroizing::new(password), "env"));
+    }
+
+    Err(CliError::MissingAccountPassword)
 }
 
 async fn handle_files(
@@ -463,6 +536,19 @@ struct AuthAddOutput {
     auth_type: String,
     credential_backend: String,
     credential_stored: bool,
+    cache_invalidated: bool,
+    default_profile: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct AuthAppPasswordOutput {
+    profile: String,
+    server: String,
+    username: String,
+    auth_type: String,
+    credential_backend: String,
+    credential_stored: bool,
+    password_source: String,
     cache_invalidated: bool,
     default_profile: Option<String>,
 }

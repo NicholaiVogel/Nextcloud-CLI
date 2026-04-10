@@ -84,6 +84,7 @@ pub struct ProfileNameArgs {
 #[derive(Debug, Subcommand)]
 pub enum AuthCommand {
     Login(AuthLoginArgs),
+    AppPassword(AuthAppPasswordArgs),
     Add(AuthAddArgs),
     Status,
 }
@@ -104,6 +105,27 @@ pub struct AuthLoginArgs {
 
     #[arg(long, default_value_t = false)]
     pub no_open: bool,
+
+    #[arg(long, default_value_t = true)]
+    pub set_default: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct AuthAppPasswordArgs {
+    #[arg(long)]
+    pub server: String,
+
+    #[arg(long, alias = "username")]
+    pub user: String,
+
+    #[arg(long)]
+    pub profile: Option<String>,
+
+    #[arg(long, default_value_t = false)]
+    pub password_stdin: bool,
+
+    #[arg(long)]
+    pub password_env: Option<String>,
 
     #[arg(long, default_value_t = true)]
     pub set_default: bool,

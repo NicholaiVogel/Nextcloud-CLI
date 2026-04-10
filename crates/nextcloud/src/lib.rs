@@ -11,7 +11,10 @@ pub mod error;
 pub mod models;
 pub mod webdav;
 
-pub use auth::{LoginFlowV2Client, LoginFlowV2Credentials, LoginFlowV2Poll, LoginFlowV2Start};
+pub use auth::{
+    AppPasswordClient, AppPasswordCredentials, LoginFlowV2Client, LoginFlowV2Credentials,
+    LoginFlowV2Poll, LoginFlowV2Start,
+};
 pub use capabilities::{CapabilitiesClient, ServerCapabilities, ServerStatus};
 pub use client::{ClientAuth, NextcloudClient};
 pub use config_schema::{

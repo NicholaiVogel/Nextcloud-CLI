@@ -61,6 +61,32 @@ fn auth_add_persists_profile_without_printing_secret() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn auth_app_password_requires_password_source() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "app-password",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("missing_account_password"));
+
+    Ok(())
+}
+
+#[test]
 fn nxc_alias_runs_same_binary() -> Result<(), Box<dyn std::error::Error>> {
     Command::cargo_bin("nxc")?
         .args(["commands", "schema"])

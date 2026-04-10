@@ -10,6 +10,10 @@ This repository is in the first implementation pass. The canonical product contr
 cargo run -p nextcloud-cli -- commands schema
 cargo run -p nextcloud-cli -- config doctor
 cargo run -p nextcloud-cli -- auth login --server https://cloud.example.com --no-open
+cargo run -p nextcloud-cli -- auth app-password \
+  --server https://cloud.example.com \
+  --user you \
+  --password-stdin
 cargo run -p nextcloud-cli -- auth add \
   --server https://cloud.example.com \
   --user you \
@@ -18,7 +22,15 @@ cargo run -p nextcloud-cli -- auth status
 cargo run -p nextcloud-cli -- server capabilities --refresh
 ```
 
-The CLI defaults to JSON output. Secrets are not stored in `config.json`; the initial credential backend is abstracted behind a credential store and currently writes a `0600` local credential file while the OS keyring backend is added.
+The CLI defaults to JSON output. Secrets are not stored in `config.json`; the
+credential backend uses the operating-system keyring when available and falls
+back to an owner-only local credential file in headless environments.
+
+`auth login --no-open` works over SSH if you can approve the printed URL from
+another browser. `auth app-password --password-stdin` is the fully headless path:
+it uses the account password only long enough to mint an app password through
+Nextcloud's OCS endpoint, then stores the app password through the credential
+backend.
 
 ## Development
 
