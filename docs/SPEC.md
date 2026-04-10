@@ -77,10 +77,16 @@ cargo run -q -p nextcloud-cli -- --version
 cargo run -q -p nextcloud-cli --bin nxc -- --version
 ```
 
+Real-server smoke started against `https://nextcloud.biohazardvfx.com`:
+
+- `status.php` succeeded and reported Nextcloud `29.0.1`.
+- Login Flow v2 start succeeded and produced an approval URL.
+- Authenticated smoke is still pending browser approval.
+
 Important pending items before MVP:
 
-- Real-server Login Flow v2 smoke validation.
-- OS keyring credential backend.
+- Complete real-server Login Flow v2 approval smoke.
+- OS keyring backend validation on target desktop/server platforms.
 - Broader real-server smoke validation across auth, capabilities, and files.
 - Mock HTTP tests for WebDAV and OCS commands.
 - `files upload`, `files download`, and file search.
@@ -684,8 +690,8 @@ Implementation notes:
   `--dry-run`.
 - `auth login` and `auth add` are implemented. `auth login` has `--no-open` for
   headless use.
-- Credential storage uses an abstraction with a local file backend and owner-only
-  Unix permissions. OS keyring support remains pending.
+- Credential storage uses an abstraction with `keyring-auto`, an OS keyring backend,
+  and a local owner-only file fallback for headless environments.
 - `server capabilities` uses a per-profile cache. `--refresh` bypasses and
   rewrites the cache.
 - `update check` currently reports development placeholder metadata. Release
@@ -5028,8 +5034,8 @@ Deliverables:
 - Login Flow v2 auth: implemented through `auth login`; real-server smoke still
   pending
 - manual app-password auth: implemented through `auth add`
-- secure credential storage abstraction: partial, abstraction and local file backend
-  implemented, OS keyring pending
+- secure credential storage abstraction: partial, abstraction, OS keyring backend, and local file fallback
+  implemented; target-platform keyring validation pending
 - profile selection and ambiguity handling: partial, `--profile`,
   `NEXTCLOUD_CLI_PROFILE`, and stored default profile implemented; multiple-profile
   ambiguity listing remains pending

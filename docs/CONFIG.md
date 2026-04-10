@@ -26,12 +26,23 @@ Profile selection currently follows this order for implemented commands:
 
 ## Credentials
 
-The current credential store is abstracted in code and uses a local file backend:
+The credential store is abstracted behind backend selection. By default, the CLI
+uses `keyring-auto`: it tries the operating-system keyring first and falls back to
+the local file backend when no usable keyring is available, which is common in
+headless development containers.
+
+Force a backend with:
+
+```bash
+NEXTCLOUD_CLI_KEYRING_BACKEND=keyring nextcloud-cli auth status
+NEXTCLOUD_CLI_KEYRING_BACKEND=file nextcloud-cli auth status
+```
+
+The local file backend stores credentials here:
 
 ```text
 $XDG_CONFIG_HOME/nextcloud-cli/credentials.json
 ```
 
 On Unix this file is written with owner-only permissions. App passwords are not
-written to `config.json` or normal command output. OS keyring support remains
-pending.
+written to `config.json` or normal command output.

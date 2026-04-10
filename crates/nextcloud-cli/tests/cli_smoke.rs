@@ -6,6 +6,7 @@ use tempfile::TempDir;
 #[test]
 fn commands_schema_is_json() -> Result<(), Box<dyn std::error::Error>> {
     let output = Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
         .args(["commands", "schema"])
         .output()?;
     assert!(output.status.success());
@@ -20,6 +21,7 @@ fn auth_add_persists_profile_without_printing_secret() -> Result<(), Box<dyn std
     let temp = TempDir::new()?;
 
     Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
         .args([
             "--config-dir",
             temp.path().to_str().expect("utf8 path"),
@@ -44,6 +46,7 @@ fn auth_add_persists_profile_without_printing_secret() -> Result<(), Box<dyn std
     assert!(!config.contains("super-secret"));
 
     Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
         .args([
             "--config-dir",
             temp.path().to_str().expect("utf8 path"),
@@ -73,6 +76,7 @@ fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::
 
     for profile in ["personal", "work"] {
         Command::cargo_bin("nextcloud-cli")?
+            .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
             .args([
                 "--config-dir",
                 temp.path().to_str().expect("utf8 path"),
@@ -92,6 +96,7 @@ fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::
     }
 
     Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
         .env("NEXTCLOUD_CLI_PROFILE", "work")
         .args([
             "--config-dir",

@@ -31,6 +31,9 @@ pub enum CliError {
         source: serde_json::Error,
     },
 
+    #[error("keyring credential backend failed: {0}")]
+    Keyring(String),
+
     #[error("failed to read capability cache from {path}: {source}")]
     CacheRead {
         path: PathBuf,
@@ -70,6 +73,7 @@ impl CliError {
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
             Self::CredentialParse { .. } => "credential_parse_failed",
+            Self::Keyring(_) => "keyring_failed",
             Self::CacheRead { .. } => "cache_read_failed",
             Self::CacheWrite { .. } => "cache_write_failed",
             Self::CacheParse { .. } => "cache_parse_failed",

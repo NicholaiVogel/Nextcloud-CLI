@@ -20,6 +20,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 chrono.workspace = true
+keyring.workspace = true
 clap.workspace = true
 nextcloud = { path = "../nextcloud", version = "0.1.0" }
 serde.workspace = true

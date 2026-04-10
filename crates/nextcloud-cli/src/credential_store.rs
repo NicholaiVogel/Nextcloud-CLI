@@ -12,14 +12,20 @@ const CREDENTIAL_FILE_NAME: &str = "credentials.json";
 
 #[derive(Debug, Clone)]
 pub struct CredentialStore {
-    backend: FileCredentialBackend,
+    backend: CredentialBackendKind,
 }
 
 impl CredentialStore {
     pub fn new(config_dir: &Path) -> Self {
-        Self {
-            backend: FileCredentialBackend::new(config_dir),
-        }
+        let file = FileCredentialBackend::new(config_dir);
+        let backend = match std::env::var("NEXTCLOUD_CLI_KEYRING_BACKEND") {
+            Ok(value) if value.eq_ignore_ascii_case("file") => CredentialBackendKind::File(file),
+            Ok(value) if value.eq_ignore_ascii_case("keyring") => {
+                CredentialBackendKind::Keyring(KeyringCredentialBackend::new(file, false))
+            }
+            _ => CredentialBackendKind::Keyring(KeyringCredentialBackend::new(file, true)),
+        };
+        Self { backend }
     }
 
     pub fn path(&self) -> &Path {
@@ -49,6 +55,54 @@ impl CredentialStore {
     }
 }
 
+#[derive(Debug, Clone)]
+enum CredentialBackendKind {
+    File(FileCredentialBackend),
+    Keyring(KeyringCredentialBackend),
+}
+
+impl CredentialBackendKind {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::File(backend) => backend.name(),
+            Self::Keyring(backend) => backend.name(),
+        }
+    }
+
+    fn path(&self) -> &Path {
+        match self {
+            Self::File(backend) => backend.path(),
+            Self::Keyring(backend) => backend.path(),
+        }
+    }
+
+    fn put_app_password(
+        &self,
+        credential: &CredentialRef,
+        username: &str,
+        app_password: &str,
+    ) -> CliResult<()> {
+        match self {
+            Self::File(backend) => backend.put_app_password(credential, username, app_password),
+            Self::Keyring(backend) => backend.put_app_password(credential, username, app_password),
+        }
+    }
+
+    fn get_app_password(&self, credential: &CredentialRef) -> CliResult<String> {
+        match self {
+            Self::File(backend) => backend.get_app_password(credential),
+            Self::Keyring(backend) => backend.get_app_password(credential),
+        }
+    }
+
+    fn has_credential(&self, credential: &CredentialRef) -> CliResult<bool> {
+        match self {
+            Self::File(backend) => backend.has_credential(credential),
+            Self::Keyring(backend) => backend.has_credential(credential),
+        }
+    }
+}
+
 trait CredentialBackend {
     fn name(&self) -> &'static str;
     fn path(&self) -> &Path;
@@ -60,6 +114,87 @@ trait CredentialBackend {
     ) -> CliResult<()>;
     fn get_app_password(&self, credential: &CredentialRef) -> CliResult<String>;
     fn has_credential(&self, credential: &CredentialRef) -> CliResult<bool>;
+}
+
+#[derive(Debug, Clone)]
+struct KeyringCredentialBackend {
+    file_fallback: FileCredentialBackend,
+    allow_fallback: bool,
+}
+
+impl KeyringCredentialBackend {
+    fn new(file_fallback: FileCredentialBackend, allow_fallback: bool) -> Self {
+        Self {
+            file_fallback,
+            allow_fallback,
+        }
+    }
+
+    fn entry(&self, credential: &CredentialRef) -> CliResult<keyring::Entry> {
+        keyring::Entry::new(&credential.service, &credential.id)
+            .map_err(|source| CliError::Keyring(source.to_string()))
+    }
+}
+
+impl CredentialBackend for KeyringCredentialBackend {
+    fn name(&self) -> &'static str {
+        if self.allow_fallback {
+            "keyring-auto"
+        } else {
+            "keyring"
+        }
+    }
+
+    fn path(&self) -> &Path {
+        self.file_fallback.path()
+    }
+
+    fn put_app_password(
+        &self,
+        credential: &CredentialRef,
+        username: &str,
+        app_password: &str,
+    ) -> CliResult<()> {
+        match self.entry(credential).and_then(|entry| {
+            entry
+                .set_password(app_password)
+                .map_err(|source| CliError::Keyring(source.to_string()))
+        }) {
+            Ok(()) => Ok(()),
+            Err(error) if self.allow_fallback => {
+                tracing::warn!(error = %error, "falling back to local credential file");
+                self.file_fallback
+                    .put_app_password(credential, username, app_password)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn get_app_password(&self, credential: &CredentialRef) -> CliResult<String> {
+        match self.entry(credential).and_then(|entry| {
+            entry
+                .get_password()
+                .map_err(|source| CliError::Keyring(source.to_string()))
+        }) {
+            Ok(password) => Ok(password),
+            Err(error) if self.allow_fallback => {
+                tracing::debug!(error = %error, "falling back to local credential file");
+                self.file_fallback.get_app_password(credential)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn has_credential(&self, credential: &CredentialRef) -> CliResult<bool> {
+        match self.get_app_password(credential) {
+            Ok(_) => Ok(true),
+            Err(CliError::Core(CoreError::CredentialNotFound { .. })) => Ok(false),
+            Err(CliError::Keyring(_)) if self.allow_fallback => {
+                self.file_fallback.has_credential(credential)
+            }
+            Err(error) => Err(error),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
