@@ -166,6 +166,8 @@ pub enum FilesCommand {
     List(FilesPathArgs),
     Stat(FilesPathArgs),
     Mkdir(FilesMkdirArgs),
+    Upload(FilesUploadArgs),
+    Download(FilesDownloadArgs),
 }
 
 #[derive(Debug, Args)]
@@ -179,7 +181,33 @@ pub struct FilesMkdirArgs {
     pub path: String,
 
     #[arg(long, default_value_t = false)]
+    pub parents: bool,
+
+    #[arg(long, default_value_t = false)]
     pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct FilesUploadArgs {
+    pub local: PathBuf,
+
+    pub remote: String,
+
+    #[arg(long, default_value_t = false)]
+    pub overwrite: bool,
+
+    #[arg(long)]
+    pub content_type: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct FilesDownloadArgs {
+    pub remote: String,
+
+    pub local: PathBuf,
+
+    #[arg(long, default_value_t = false)]
+    pub overwrite: bool,
 }
 
 #[derive(Debug, Subcommand)]

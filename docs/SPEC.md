@@ -37,8 +37,8 @@ Last updated: 2026-04-10 after the Phase 1 continuation work.
 The repository now has a working Rust workspace and an initial executable CLI.
 The current implementation covers the repository spine, Login Flow v2, fully
 headless app-password auth, manual app-password auth, profile/config plumbing,
-server status/capability calls with a per-profile cache, and the first WebDAV
-file commands. The GitHub repository exists at
+server status/capability calls with a per-profile cache, and the core WebDAV
+file-transfer commands. The GitHub repository exists at
 <https://github.com/NicholaiVogel/Nextcloud-CLI> and `main` tracks
 `origin/main`.
 
@@ -61,9 +61,11 @@ Completed so far:
 - `server status` through `status.php`.
 - `server capabilities` through OCS cloud capabilities, with `--refresh` and
   per-profile cache support.
-- Initial WebDAV client with PROPFIND and MKCOL support.
+- WebDAV client with PROPFIND, MKCOL, PUT, and GET support.
 - Multistatus XML parser with unit coverage.
-- `files list`, `files stat`, and `files mkdir --dry-run`.
+- Remote path normalization and segment encoding with unit coverage.
+- `files list`, `files stat`, `files mkdir --parents`, `files upload`, and
+  `files download`.
 - Command metadata through `commands schema`.
 - README plus `docs/COMMANDS.md`, `docs/CONFIG.md`, `docs/INSTALL.md`,
   `docs/NETWORK.md`, `docs/SMOKE.md`, and `docs/COMPATIBILITY.md`.
@@ -85,15 +87,17 @@ Real-server smoke against `https://nextcloud.biohazardvfx.com`:
 - Login Flow v2 start succeeded and produced an approval URL.
 - `auth app-password --password-env` succeeded for the `biohazard` profile.
 - `auth status`, `server status`, `server capabilities --refresh`, `files list /`,
-  and `files mkdir /nextcloud-cli-smoke --dry-run` succeeded.
+  `files mkdir --parents`, `files upload`, `files stat`, and `files download`
+  succeeded.
+- Downloaded fixture bytes matched the uploaded fixture.
 - Capability smoke reported 20 top-level capability groups.
 
 Important pending items before MVP:
 
 - OS keyring backend validation on target desktop/server platforms.
-- Broader real-server smoke validation across non-dry-run file writes and cleanup.
+- Cleanup support for smoke artifacts once destructive file commands exist.
 - Mock HTTP tests for WebDAV and OCS commands.
-- `files upload`, `files download`, and file search.
+- DAV name search.
 - Shares, calendar, contacts, notes, Deck, activity, raw DAV/OCS commands.
 - Full profile policy commands and enforcement.
 - Distribution work: release artifacts, npm wrapper, curl installer, and real
@@ -680,7 +684,9 @@ nextcloud-cli server status
 nextcloud-cli server capabilities [--refresh]
 nextcloud-cli files list [path]
 nextcloud-cli files stat <path>
-nextcloud-cli files mkdir <path> --dry-run
+nextcloud-cli files mkdir <path> [--parents] [--dry-run]
+nextcloud-cli files upload <local> <remote> [--overwrite] [--content-type <mime>]
+nextcloud-cli files download <remote> <local> [--overwrite]
 nextcloud-cli update check
 ```
 
@@ -700,6 +706,10 @@ Implementation notes:
   and a local owner-only file fallback for headless environments.
 - `server capabilities` uses a per-profile cache. `--refresh` bypasses and
   rewrites the cache.
+- `files upload` refuses to overwrite an existing remote path unless
+  `--overwrite` is passed.
+- `files download` refuses to overwrite an existing local file unless
+  `--overwrite` is passed.
 - `update check` currently reports development placeholder metadata. Release
   discovery and `update apply` remain pending.
 
@@ -5127,27 +5137,30 @@ nextcloud-cli server capabilities --format json
 
 ### 41.3 Phase 2: WebDAV files core
 
-Status: partial. The initial WebDAV client, multistatus parser, `files list`,
-`files stat`, and `files mkdir --dry-run` are implemented. Upload, download, DAV
-search, broader path-encoding coverage, and mock HTTP tests remain pending.
+Status: partial. The WebDAV client, multistatus parser, path normalization,
+`files list`, `files stat`, `files mkdir --parents`, `files upload`, and
+`files download` are implemented. DAV search, streaming large-download handling,
+cleanup/delete support, and mock HTTP tests remain pending.
 
 Deliverables:
 
-- remote path normalization and segment encoding: partial
-- WebDAV client: partial, PROPFIND and MKCOL implemented
+- remote path normalization and segment encoding: implemented with unit coverage
+- WebDAV client: partial, PROPFIND, MKCOL, PUT, and GET implemented
 - multistatus parser: implemented with unit coverage
 - `files list`: implemented
 - `files stat`: implemented
-- `files mkdir`: partial, `--dry-run` and MKCOL path implemented
-- `files upload` simple PUT path: pending
-- `files download` streaming path: pending
+- `files mkdir`: implemented with `--dry-run`, MKCOL, and `--parents`
+- `files upload` simple PUT path: implemented
+- `files download` buffered path: implemented; streaming large-download path pending
 - DAV name search: pending
 
 Completion signal:
 
 ```bash
-nextcloud-cli files mkdir /nextcloud-cli-smoke --dry-run
+nextcloud-cli files mkdir /nextcloud-cli-smoke --parents
 nextcloud-cli files list / --format json
+nextcloud-cli files upload ./fixture.txt /nextcloud-cli-smoke/fixture.txt --format json
+nextcloud-cli files download /nextcloud-cli-smoke/fixture.txt ./fixture.downloaded --format json
 nextcloud-cli files search report --search-mode name --format json
 ```
 

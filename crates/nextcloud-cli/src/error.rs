@@ -19,6 +19,15 @@ pub enum CliError {
     #[error("failed to read account password from stdin: {0}")]
     PasswordStdinRead(#[source] std::io::Error),
 
+    #[error("local file already exists at {path}; pass --overwrite to replace it")]
+    LocalFileExists { path: PathBuf },
+
+    #[error("local upload path {path} is not a file")]
+    LocalUploadNotFile { path: PathBuf },
+
+    #[error("remote path {path} already exists; pass --overwrite to replace it")]
+    RemotePathExists { path: String },
+
     #[error("failed to read credentials from {path}: {source}")]
     CredentialRead {
         path: PathBuf,
@@ -82,6 +91,9 @@ impl CliError {
             Self::MissingAccountPassword => "missing_account_password",
             Self::PasswordEnvMissing { .. } => "password_env_missing",
             Self::PasswordStdinRead(_) => "password_stdin_read_failed",
+            Self::LocalFileExists { .. } => "local_file_exists",
+            Self::LocalUploadNotFile { .. } => "local_upload_not_file",
+            Self::RemotePathExists { .. } => "remote_path_exists",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
             Self::CredentialParse { .. } => "credential_parse_failed",
@@ -100,9 +112,13 @@ impl CliError {
             Self::Core(nextcloud::Error::NoProfileSelected) => 2,
             Self::Core(nextcloud::Error::ProfileNotFound { .. }) => 2,
             Self::Core(nextcloud::Error::CredentialNotFound { .. }) => 2,
+            Self::Core(nextcloud::Error::InvalidRemotePath { .. }) => 2,
             Self::MissingAppPassword => 2,
             Self::MissingAccountPassword => 2,
             Self::PasswordEnvMissing { .. } => 2,
+            Self::LocalFileExists { .. } => 2,
+            Self::LocalUploadNotFile { .. } => 2,
+            Self::RemotePathExists { .. } => 2,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,
             Self::Core(nextcloud::Error::Http(_)) => 3,

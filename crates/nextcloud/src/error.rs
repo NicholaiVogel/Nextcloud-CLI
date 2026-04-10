@@ -63,6 +63,9 @@ pub enum Error {
     #[error("credential `{id}` was not found")]
     CredentialNotFound { id: String },
 
+    #[error("invalid remote path `{path}`: {reason}")]
+    InvalidRemotePath { path: String, reason: String },
+
     #[error("network request failed: {0}")]
     Http(#[from] reqwest::Error),
 
@@ -87,6 +90,7 @@ impl Error {
             Self::ProfileNotFound { .. } => "profile_not_found",
             Self::NoProfileSelected => "no_profile_selected",
             Self::CredentialNotFound { .. } => "credential_not_found",
+            Self::InvalidRemotePath { .. } => "invalid_remote_path",
             Self::Http(_) => "http_request_failed",
             Self::HttpStatus { .. } => "http_status_failed",
         }

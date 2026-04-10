@@ -7,7 +7,9 @@ mod output;
 
 use chrono::Utc;
 use clap::Parser;
+use std::fs;
 use std::io::Read;
+use std::path::Path;
 use std::time::Duration;
 use tokio::time::{Instant, sleep};
 use zeroize::Zeroizing;
@@ -371,31 +373,109 @@ async fn handle_files(
 
     match command {
         FilesCommand::List(args) => {
-            let entries = webdav.list(&args.path).await?;
+            let path = nextcloud::webdav::normalize_remote_path(&args.path)?;
+            let entries = webdav.list(&path).await?;
+            let count = entries.len();
             json_value(json!({
-                "path": args.path,
+                "path": path,
                 "entries": entries,
+                "count": count,
             }))
         }
         FilesCommand::Stat(args) => {
-            let entry = webdav.stat(&args.path).await?;
+            let path = nextcloud::webdav::normalize_remote_path(&args.path)?;
+            let entry = webdav.stat(&path).await?;
             json_value(json!({
-                "path": args.path,
+                "path": path,
                 "entry": entry,
             }))
         }
         FilesCommand::Mkdir(args) => {
-            if !args.dry_run {
-                webdav.mkdir(&args.path).await?;
-            }
+            let normalized = nextcloud::webdav::normalize_remote_path(&args.path)?;
+            let parents_created = if args.dry_run {
+                Vec::new()
+            } else if args.parents {
+                webdav.mkdir_parents(&normalized).await?
+            } else {
+                webdav.mkdir(&normalized).await?;
+                vec![normalized.clone()]
+            };
             json_value(json!({
-                "path": args.path,
+                "path": normalized,
                 "dry_run": args.dry_run,
                 "created": !args.dry_run,
                 "method": "MKCOL",
+                "parents": args.parents,
+                "parents_created": parents_created,
             }))
         }
+        FilesCommand::Upload(args) => {
+            let remote = nextcloud::webdav::normalize_remote_path(&args.remote)?;
+            let local = args.local;
+            ensure_upload_file(&local)?;
+            if !args.overwrite && webdav.exists(&remote).await? {
+                return Err(CliError::RemotePathExists { path: remote });
+            }
+
+            let bytes = fs::read(&local).map_err(|source| nextcloud::Error::ReadFile {
+                path: local.clone(),
+                source,
+            })?;
+            let bytes_uploaded = bytes.len() as u64;
+            let etag = webdav
+                .upload(&remote, bytes, args.content_type.as_deref())
+                .await?;
+            let entry = webdav.stat(&remote).await?.map(|mut entry| {
+                if entry.etag.is_none() {
+                    entry.etag.clone_from(&etag);
+                }
+                entry
+            });
+
+            json_value(FilesUploadOutput {
+                remote,
+                local: local.display().to_string(),
+                bytes_uploaded,
+                etag,
+                overwritten: args.overwrite,
+                entry,
+            })
+        }
+        FilesCommand::Download(args) => {
+            let remote = nextcloud::webdav::normalize_remote_path(&args.remote)?;
+            let local = args.local;
+            if local.exists() && !args.overwrite {
+                return Err(CliError::LocalFileExists { path: local });
+            }
+
+            let bytes = webdav.download(&remote).await?;
+            let bytes_written = bytes.len() as u64;
+            fs::write(&local, bytes).map_err(|source| nextcloud::Error::WriteFile {
+                path: local.clone(),
+                source,
+            })?;
+
+            json_value(FilesDownloadOutput {
+                remote,
+                local: local.display().to_string(),
+                bytes_written,
+                overwritten: args.overwrite,
+            })
+        }
     }
+}
+
+fn ensure_upload_file(path: &Path) -> CliResult<()> {
+    let metadata = fs::metadata(path).map_err(|source| nextcloud::Error::ReadFile {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    if !metadata.is_file() {
+        return Err(CliError::LocalUploadNotFile {
+            path: path.to_path_buf(),
+        });
+    }
+    Ok(())
 }
 
 async fn handle_server(
@@ -574,6 +654,24 @@ struct AuthStatusOutput {
     username: String,
     credential_backend: String,
     credential_stored: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct FilesUploadOutput {
+    remote: String,
+    local: String,
+    bytes_uploaded: u64,
+    etag: Option<String>,
+    overwritten: bool,
+    entry: Option<nextcloud::WebDavEntry>,
+}
+
+#[derive(Debug, Serialize)]
+struct FilesDownloadOutput {
+    remote: String,
+    local: String,
+    bytes_written: u64,
+    overwritten: bool,
 }
 
 #[derive(Debug, Serialize)]

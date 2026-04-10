@@ -8,7 +8,7 @@ storing only the generated app password.
 
 | Server version | Profile | Files | Shares | Calendar | Contacts | Notes | Deck | Activity | Tested at |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 29.0.1 | biohazard | list, dry-run mkdir | pending | pending | pending | pending | pending | pending | 2026-04-10 |
+| 29.0.1 | biohazard | list, mkdir, upload, stat, download | pending | pending | pending | pending | pending | pending | 2026-04-10 |
 
 Notes:
 
@@ -16,5 +16,10 @@ Notes:
 - Login Flow v2 start succeeded and produced an approval URL.
 - `auth app-password --password-env` succeeded for the `biohazard` profile.
 - `auth status`, `server status`, `server capabilities --refresh`, `files list /`,
-  and `files mkdir /nextcloud-cli-smoke --dry-run` succeeded.
+  `files mkdir --parents`, `files upload`, `files stat`, and `files download`
+  succeeded.
+- Downloaded fixture bytes matched the uploaded fixture.
+- Write smoke left a small fixture at
+  `/nextcloud-cli-smoke-20260410T233520Z/hello file #1.txt`; remove it once
+  destructive file commands exist.
 - Capability smoke reported 20 top-level capability groups.

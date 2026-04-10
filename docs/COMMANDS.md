@@ -6,7 +6,8 @@ Generated command metadata is available from the CLI:
 nextcloud-cli commands schema --format json
 ```
 
-The current implementation covers the repository spine and the first auth/profile/server detection slice:
+The current implementation covers the repository spine, the first
+auth/profile/server detection slice, and the core WebDAV file-transfer commands:
 
 - `commands schema`
 - `config path`
@@ -23,5 +24,7 @@ The current implementation covers the repository spine and the first auth/profil
 - `server capabilities [--refresh]`
 - `files list [path]`
 - `files stat <path>`
-- `files mkdir <path> [--dry-run]`
+- `files mkdir <path> [--parents] [--dry-run]`
+- `files upload <local> <remote> [--overwrite] [--content-type <mime>]`
+- `files download <remote> <local> [--overwrite]`
 - `update check`

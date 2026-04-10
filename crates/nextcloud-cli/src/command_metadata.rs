@@ -88,6 +88,16 @@ pub fn command_schema() -> CommandSchema {
                 "FilesMkdirResult",
             ),
             stable(
+                "files upload",
+                "Upload a local file to a remote Nextcloud path through WebDAV.",
+                "FilesUploadResult",
+            ),
+            stable(
+                "files download",
+                "Download a remote Nextcloud file to a local path through WebDAV.",
+                "FilesDownloadResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

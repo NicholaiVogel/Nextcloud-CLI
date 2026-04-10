@@ -138,6 +138,52 @@ impl NextcloudClient {
         Ok(body)
     }
 
+    pub async fn request_bytes(&self, method: Method, path: &str) -> Result<Vec<u8>> {
+        let url = self.join(path)?;
+        let mut request = self.http.request(method, url);
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+
+        let response = request.send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_else(|_| String::new());
+            return Err(Error::HttpStatus { status, body });
+        }
+
+        Ok(response.bytes().await?.to_vec())
+    }
+
+    pub async fn put_bytes(
+        &self,
+        path: &str,
+        bytes: Vec<u8>,
+        content_type: Option<&str>,
+    ) -> Result<Option<String>> {
+        let url = self.join(path)?;
+        let mut request = self.http.put(url).body(bytes);
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+        if let Some(content_type) = content_type {
+            request = request.header(CONTENT_TYPE, content_type);
+        }
+
+        let response = request.send().await?;
+        let status = response.status();
+        let headers = response.headers().clone();
+        let body = response.text().await.unwrap_or_else(|_| String::new());
+        if !status.is_success() {
+            return Err(Error::HttpStatus { status, body });
+        }
+
+        Ok(headers
+            .get("etag")
+            .and_then(|value| value.to_str().ok())
+            .map(|value| value.trim_matches('"').to_owned()))
+    }
+
     pub fn join(&self, path: &str) -> Result<Url> {
         let normalized = path.trim_start_matches('/');
         self.server
