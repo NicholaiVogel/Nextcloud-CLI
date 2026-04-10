@@ -29,6 +29,65 @@ config, HTTP client, WebDAV file listing, JSON output, and error envelopes come
 before optional app depth. That gives the project a working spine before the
 ribs go on. No need to hang curtains before the house has studs.
 
+
+## Implementation Status Snapshot
+
+Last updated: 2026-04-10 after commit `8d3139e`
+(`feat: build initial nextcloud cli spine`).
+
+The repository now has a working Rust workspace and an initial executable CLI.
+The current implementation covers the repository spine, manual app-password auth,
+profile/config plumbing, server status/capability calls, and the first WebDAV
+file commands. The GitHub repository exists at
+<https://github.com/NicholaiVogel/Nextcloud-CLI> and `main` tracks
+`origin/main`.
+
+Completed so far:
+
+- Rust workspace with `nextcloud` library crate and `nextcloud-cli` binary crate.
+- `nextcloud-cli` binary plus `nxc` development alias.
+- JSON output by default for implemented commands.
+- Stable JSON error envelope for CLI/runtime errors.
+- Config directory resolution with `NEXTCLOUD_CLI_CONFIG_DIR` and `--config-dir`.
+- Profile config schema with schema version, default profile, server, username,
+  credential reference, and safe default policy fields.
+- Initial local credential backend storing app passwords outside `config.json`
+  with owner-only file permissions on Unix.
+- Manual app-password setup through `auth add`.
+- `auth status`, `profiles list`, `profiles show`, and `profiles set-default`.
+- `server status` through `status.php`.
+- `server capabilities` through OCS cloud capabilities.
+- Initial WebDAV client with PROPFIND and MKCOL support.
+- Multistatus XML parser with unit coverage.
+- `files list`, `files stat`, and `files mkdir --dry-run`.
+- Command metadata through `commands schema`.
+- README plus `docs/COMMANDS.md`, `docs/CONFIG.md`, `docs/INSTALL.md`,
+  `docs/NETWORK.md`, `docs/SMOKE.md`, and `docs/COMPATIBILITY.md`.
+- GitHub Actions CI for fmt, clippy, and tests.
+
+Validation that passed after the initial implementation:
+
+```bash
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo run -q -p nextcloud-cli -- --version
+cargo run -q -p nextcloud-cli --bin nxc -- --version
+```
+
+Important pending items before MVP:
+
+- Login Flow v2 auth.
+- OS keyring credential backend.
+- Capability cache.
+- Real-server smoke validation.
+- Mock HTTP tests for WebDAV and OCS commands.
+- `files upload`, `files download`, and file search.
+- Shares, calendar, contacts, notes, Deck, activity, raw DAV/OCS commands.
+- Full profile policy commands and enforcement.
+- Distribution work: release artifacts, npm wrapper, curl installer, and real
+  self-update.
+
 ## 1. Product Summary
 
 `nextcloud-cli` is a local command line client for Nextcloud, built for humans,
@@ -590,7 +649,44 @@ nextcloud-cli update apply [--yes]
 They are specified in the distribution section, but they must appear in command
 metadata, help output, tests, and release gates like every other public command.
 
-### 7.6 Exit codes
+### 7.6 Implemented command surface
+
+Implemented as of commit `8d3139e`:
+
+```bash
+nextcloud-cli commands schema
+nextcloud-cli config path
+nextcloud-cli config show
+nextcloud-cli config doctor
+nextcloud-cli auth add --server <url> --user <user> --profile <name> --app-password <password>
+nextcloud-cli auth status
+nextcloud-cli profiles list
+nextcloud-cli profiles show <name>
+nextcloud-cli profiles set-default <name>
+nextcloud-cli server status
+nextcloud-cli server capabilities
+nextcloud-cli files list [path]
+nextcloud-cli files stat <path>
+nextcloud-cli files mkdir <path> --dry-run
+nextcloud-cli update check
+```
+
+Implementation notes:
+
+- `--format json`, `--profile`, `--config-dir`, `--no-art`, `--help`, and
+  `--version` are currently wired.
+- `--format human` currently prints the same structured JSON as `json`; richer
+  human formatting remains pending.
+- Global `--dry-run`, `--no-color`, `--quiet`, `--verbose`, `--ca-bundle`,
+  `--insecure`, and `--agent` remain pending. `files mkdir` has command-local
+  `--dry-run`.
+- `auth add` is implemented. `auth login` remains pending.
+- Credential storage currently uses a local file backend with owner-only Unix
+  permissions. OS keyring support remains pending.
+- `update check` currently reports development placeholder metadata. Release
+  discovery and `update apply` remain pending.
+
+### 7.7 Exit codes
 
 | Code | Meaning |
 | --- | --- |
@@ -4894,7 +4990,9 @@ include command wiring, JSON output, errors, tests, and documentation updates.
 
 ### 41.1 Phase 0: repository spine
 
-Deliverables:
+Status: complete as of commit `8d3139e`.
+
+Delivered:
 
 - Rust workspace with library and CLI crates
 - `nextcloud-cli` binary and `nxc` alias behavior in development
@@ -4915,16 +5013,22 @@ nextcloud-cli commands schema --format json
 
 ### 41.2 Phase 1: auth, profiles, and server detection
 
+Status: partial. Manual app-password auth, profiles, `auth status`,
+`server status`, and `server capabilities` are implemented. Login Flow v2, OS
+keyring storage, and capability cache remain pending.
+
 Deliverables:
 
-- Login Flow v2 auth
-- manual app-password auth
-- secure credential storage abstraction
-- profile selection and ambiguity handling
-- `auth status`
-- `server status`
-- `server capabilities`
-- capability cache shape
+- Login Flow v2 auth: pending
+- manual app-password auth: implemented through `auth add`
+- secure credential storage abstraction: partial, local file backend implemented, OS
+  keyring pending
+- profile selection and ambiguity handling: partial, `--profile` and stored
+  default profile implemented, environment/profile ambiguity rules pending
+- `auth status`: implemented
+- `server status`: implemented
+- `server capabilities`: implemented
+- capability cache shape: pending
 
 Completion signal:
 
@@ -4937,17 +5041,21 @@ nextcloud-cli server capabilities --format json
 
 ### 41.3 Phase 2: WebDAV files core
 
+Status: partial. The initial WebDAV client, multistatus parser, `files list`,
+`files stat`, and `files mkdir --dry-run` are implemented. Upload, download, DAV
+search, broader path-encoding coverage, and mock HTTP tests remain pending.
+
 Deliverables:
 
-- remote path normalization and segment encoding
-- WebDAV client
-- multistatus parser
-- `files list`
-- `files stat`
-- `files mkdir`
-- `files upload` simple PUT path
-- `files download` streaming path
-- DAV name search
+- remote path normalization and segment encoding: partial
+- WebDAV client: partial, PROPFIND and MKCOL implemented
+- multistatus parser: implemented with unit coverage
+- `files list`: implemented
+- `files stat`: implemented
+- `files mkdir`: partial, `--dry-run` and MKCOL path implemented
+- `files upload` simple PUT path: pending
+- `files download` streaming path: pending
+- DAV name search: pending
 
 Completion signal:
 
@@ -5016,18 +5124,22 @@ nextcloud-cli activity recent --limit 20 --format json
 
 ### 41.7 Phase 6: distribution and agent experience
 
+Status: partial. README, install/config/network/smoke docs, CI, `nxc` alias, and
+placeholder `update check` are implemented. Release packaging, npm wrapper, curl
+installer, real self-update, skills, and terminal art remain pending.
+
 Deliverables:
 
-- README quickstart
-- install docs
-- npm wrapper
-- curl installer
-- GitHub Release artifact naming and checksum verification
-- `update check`
-- direct-binary `update apply --yes`
-- setup agent skill
-- basic feature skills
-- terminal art assets and output gating
+- README quickstart: implemented for source/development workflow
+- install docs: partial, source install documented
+- npm wrapper: pending
+- curl installer: pending
+- GitHub Release artifact naming and checksum verification: pending
+- `update check`: partial, development placeholder implemented
+- direct-binary `update apply --yes`: pending
+- setup agent skill: pending
+- basic feature skills: pending
+- terminal art assets and output gating: pending
 
 Completion signal:
 
