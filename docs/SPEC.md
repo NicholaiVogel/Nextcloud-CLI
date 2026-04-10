@@ -35,9 +35,10 @@ ribs go on. No need to hang curtains before the house has studs.
 Last updated: 2026-04-10 after the Phase 1 continuation work.
 
 The repository now has a working Rust workspace and an initial executable CLI.
-The current implementation covers the repository spine, Login Flow v2, manual
-app-password auth, profile/config plumbing, server status/capability calls with a
-per-profile cache, and the first WebDAV file commands. The GitHub repository exists at
+The current implementation covers the repository spine, Login Flow v2, fully
+headless app-password auth, manual app-password auth, profile/config plumbing,
+server status/capability calls with a per-profile cache, and the first WebDAV
+file commands. The GitHub repository exists at
 <https://github.com/NicholaiVogel/Nextcloud-CLI> and `main` tracks
 `origin/main`.
 
@@ -78,19 +79,19 @@ cargo run -q -p nextcloud-cli -- --version
 cargo run -q -p nextcloud-cli --bin nxc -- --version
 ```
 
-Real-server smoke started against `https://nextcloud.biohazardvfx.com`:
+Real-server smoke against `https://nextcloud.biohazardvfx.com`:
 
 - `status.php` succeeded and reported Nextcloud `29.0.1`.
 - Login Flow v2 start succeeded and produced an approval URL.
-- Authenticated smoke is still pending headless app-password setup or browser
-  approval from another machine.
+- `auth app-password --password-env` succeeded for the `biohazard` profile.
+- `auth status`, `server status`, `server capabilities --refresh`, `files list /`,
+  and `files mkdir /nextcloud-cli-smoke --dry-run` succeeded.
+- Capability smoke reported 20 top-level capability groups.
 
 Important pending items before MVP:
 
-- Complete real-server authenticated smoke with `auth app-password --password-stdin`
-  or Login Flow v2 approval from another machine.
 - OS keyring backend validation on target desktop/server platforms.
-- Broader real-server smoke validation across auth, capabilities, and files.
+- Broader real-server smoke validation across non-dry-run file writes and cleanup.
 - Mock HTTP tests for WebDAV and OCS commands.
 - `files upload`, `files download`, and file search.
 - Shares, calendar, contacts, notes, Deck, activity, raw DAV/OCS commands.
@@ -5094,15 +5095,15 @@ nextcloud-cli commands schema --format json
 Status: partial. Login Flow v2, headless app-password minting, manual
 app-password auth, profiles, `auth status`, `server status`,
 `server capabilities`, `NEXTCLOUD_CLI_PROFILE`, OS keyring storage, and
-capability caching are implemented. Real-server authenticated smoke validation
-remains pending.
+capability caching are implemented. Real-server authenticated smoke passed
+against the `biohazard` profile on Nextcloud `29.0.1`.
 
 Deliverables:
 
 - Login Flow v2 auth: implemented through `auth login`; real-server smoke still
   pending
 - headless app-password auth: implemented through `auth app-password --password-stdin`;
-  real-server smoke still pending
+  real-server smoke passed through the env-backed equivalent `--password-env`
 - manual app-password auth: implemented through `auth add`
 - secure credential storage abstraction: partial, abstraction, OS keyring backend,
   and local file fallback implemented; target-platform keyring validation pending
