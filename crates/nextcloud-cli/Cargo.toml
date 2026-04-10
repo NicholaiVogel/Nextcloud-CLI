@@ -1,0 +1,36 @@
+[package]
+name = "nextcloud-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+description = "Client-side command line interface for Nextcloud, built for humans, scripts, and AI agents."
+default-run = "nextcloud-cli"
+readme = "../../README.md"
+keywords = ["nextcloud", "cli", "webdav", "agents"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "nextcloud-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+nextcloud = { path = "../nextcloud", version = "0.1.0" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+tempfile = "3.13"

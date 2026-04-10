@@ -1,0 +1,25 @@
+[package]
+name = "nextcloud"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+description = "Reusable Nextcloud API client library for nextcloud-cli."
+keywords = ["nextcloud", "webdav", "caldav", "carddav", "cli"]
+categories = ["api-bindings", "command-line-utilities"]
+
+[dependencies]
+chrono.workspace = true
+dirs.workspace = true
+reqwest.workspace = true
+quick-xml.workspace = true
+percent-encoding.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+url.workspace = true
+zeroize.workspace = true

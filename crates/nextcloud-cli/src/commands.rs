@@ -1,0 +1,138 @@
+use std::path::PathBuf;
+
+use clap::{Args, Parser, Subcommand, ValueEnum};
+
+#[derive(Debug, Parser)]
+#[command(
+    name = "nextcloud-cli",
+    bin_name = "nextcloud-cli",
+    version,
+    about = "Client-side Nextcloud CLI for humans, scripts, and AI agents.",
+    long_about = "Client-side Nextcloud CLI for humans, scripts, and AI agents.\n\nQuick start:\n  nextcloud-cli auth add --server https://cloud.example.com --user you --app-password $NEXTCLOUD_APP_PASSWORD\n  nextcloud-cli files list /\n\nThis project is unofficial and talks to existing Nextcloud client APIs."
+)]
+pub struct Cli {
+    #[arg(long, global = true, value_enum, default_value_t = OutputFormat::Json)]
+    pub format: OutputFormat,
+
+    #[arg(long, global = true)]
+    pub profile: Option<String>,
+
+    #[arg(long, global = true, env = "NEXTCLOUD_CLI_CONFIG_DIR")]
+    pub config_dir: Option<PathBuf>,
+
+    #[arg(long, global = true, default_value_t = false)]
+    pub no_art: bool,
+
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
+pub enum OutputFormat {
+    Json,
+    Human,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    #[command(subcommand)]
+    Commands(CommandsCommand),
+
+    #[command(subcommand)]
+    Config(ConfigCommand),
+
+    #[command(subcommand)]
+    Profiles(ProfilesCommand),
+
+    #[command(subcommand)]
+    Auth(AuthCommand),
+
+    #[command(subcommand)]
+    Server(ServerCommand),
+
+    #[command(subcommand)]
+    Files(FilesCommand),
+
+    #[command(subcommand)]
+    Update(UpdateCommand),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CommandsCommand {
+    Schema,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ConfigCommand {
+    Path,
+    Show,
+    Doctor,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProfilesCommand {
+    List,
+    Show(ProfileNameArgs),
+    SetDefault(ProfileNameArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ProfileNameArgs {
+    pub name: String,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AuthCommand {
+    Add(AuthAddArgs),
+    Status,
+}
+
+#[derive(Debug, Args)]
+pub struct AuthAddArgs {
+    #[arg(long)]
+    pub server: String,
+
+    #[arg(long, alias = "username")]
+    pub user: String,
+
+    #[arg(long)]
+    pub profile: Option<String>,
+
+    #[arg(long, env = "NEXTCLOUD_APP_PASSWORD")]
+    pub app_password: Option<String>,
+
+    #[arg(long, default_value_t = true)]
+    pub set_default: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ServerCommand {
+    Status,
+    Capabilities,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum FilesCommand {
+    List(FilesPathArgs),
+    Stat(FilesPathArgs),
+    Mkdir(FilesMkdirArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct FilesPathArgs {
+    #[arg(default_value = "/")]
+    pub path: String,
+}
+
+#[derive(Debug, Args)]
+pub struct FilesMkdirArgs {
+    pub path: String,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum UpdateCommand {
+    Check,
+}
