@@ -66,3 +66,42 @@ fn nxc_alias_runs_same_binary() -> Result<(), Box<dyn std::error::Error>> {
         .stdout(predicate::str::contains("commands schema"));
     Ok(())
 }
+
+#[test]
+fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    for profile in ["personal", "work"] {
+        Command::cargo_bin("nextcloud-cli")?
+            .args([
+                "--config-dir",
+                temp.path().to_str().expect("utf8 path"),
+                "auth",
+                "add",
+                "--server",
+                "https://cloud.example.com",
+                "--user",
+                profile,
+                "--profile",
+                profile,
+                "--app-password",
+                "super-secret",
+            ])
+            .assert()
+            .success();
+    }
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_PROFILE", "work")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "status",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"profile\": \"work\""));
+
+    Ok(())
+}

@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use reqwest::Method;
 use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue, USER_AGENT};
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 use url::Url;
 
@@ -91,6 +92,24 @@ impl NextcloudClient {
         Ok(response.json::<T>().await?)
     }
 
+    pub async fn post_empty_json<T>(&self, path: &str) -> Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        let url = self.join(path)?;
+        let response = self.http.post(url).send().await?;
+        parse_json_response(response).await
+    }
+
+    pub async fn post_form_json<F, T>(&self, url: url::Url, form: &F) -> Result<T>
+    where
+        F: Serialize + ?Sized,
+        T: DeserializeOwned,
+    {
+        let response = self.http.post(url).form(form).send().await?;
+        parse_json_response(response).await
+    }
+
     pub async fn request_text(
         &self,
         method: Method,
@@ -128,6 +147,19 @@ impl NextcloudClient {
                 source,
             })
     }
+}
+
+async fn parse_json_response<T>(response: reqwest::Response) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_else(|_| String::new());
+        return Err(Error::HttpStatus { status, body });
+    }
+
+    Ok(response.json::<T>().await?)
 }
 
 #[cfg(test)]

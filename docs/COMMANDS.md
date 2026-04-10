@@ -12,13 +12,14 @@ The current implementation covers the repository spine and the first auth/profil
 - `config path`
 - `config show`
 - `config doctor`
+- `auth login`
 - `auth add`
 - `auth status`
 - `profiles list`
 - `profiles show <name>`
 - `profiles set-default <name>`
 - `server status`
-- `server capabilities`
+- `server capabilities [--refresh]`
 - `files list [path]`
 - `files stat <path>`
 - `files mkdir <path> [--dry-run]`

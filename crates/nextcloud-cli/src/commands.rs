@@ -83,8 +83,30 @@ pub struct ProfileNameArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum AuthCommand {
+    Login(AuthLoginArgs),
     Add(AuthAddArgs),
     Status,
+}
+
+#[derive(Debug, Args)]
+pub struct AuthLoginArgs {
+    #[arg(long)]
+    pub server: String,
+
+    #[arg(long)]
+    pub profile: Option<String>,
+
+    #[arg(long, default_value_t = 600)]
+    pub timeout_seconds: u64,
+
+    #[arg(long, default_value_t = 2)]
+    pub poll_interval_seconds: u64,
+
+    #[arg(long, default_value_t = false)]
+    pub no_open: bool,
+
+    #[arg(long, default_value_t = true)]
+    pub set_default: bool,
 }
 
 #[derive(Debug, Args)]
@@ -108,7 +130,13 @@ pub struct AuthAddArgs {
 #[derive(Debug, Subcommand)]
 pub enum ServerCommand {
     Status,
-    Capabilities,
+    Capabilities(ServerCapabilitiesArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ServerCapabilitiesArgs {
+    #[arg(long, default_value_t = false)]
+    pub refresh: bool,
 }
 
 #[derive(Debug, Subcommand)]

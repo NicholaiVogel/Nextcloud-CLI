@@ -32,13 +32,12 @@ ribs go on. No need to hang curtains before the house has studs.
 
 ## Implementation Status Snapshot
 
-Last updated: 2026-04-10 after commit `8d3139e`
-(`feat: build initial nextcloud cli spine`).
+Last updated: 2026-04-10 after the Phase 1 continuation work.
 
 The repository now has a working Rust workspace and an initial executable CLI.
-The current implementation covers the repository spine, manual app-password auth,
-profile/config plumbing, server status/capability calls, and the first WebDAV
-file commands. The GitHub repository exists at
+The current implementation covers the repository spine, Login Flow v2, manual
+app-password auth, profile/config plumbing, server status/capability calls with a
+per-profile cache, and the first WebDAV file commands. The GitHub repository exists at
 <https://github.com/NicholaiVogel/Nextcloud-CLI> and `main` tracks
 `origin/main`.
 
@@ -51,12 +50,15 @@ Completed so far:
 - Config directory resolution with `NEXTCLOUD_CLI_CONFIG_DIR` and `--config-dir`.
 - Profile config schema with schema version, default profile, server, username,
   credential reference, and safe default policy fields.
-- Initial local credential backend storing app passwords outside `config.json`
-  with owner-only file permissions on Unix.
+- Credential backend abstraction with an initial local file backend storing app
+  passwords outside `config.json` with owner-only file permissions on Unix.
+- Login Flow v2 setup through `auth login`, including `--no-open` for headless
+  use.
 - Manual app-password setup through `auth add`.
 - `auth status`, `profiles list`, `profiles show`, and `profiles set-default`.
 - `server status` through `status.php`.
-- `server capabilities` through OCS cloud capabilities.
+- `server capabilities` through OCS cloud capabilities, with `--refresh` and
+  per-profile cache support.
 - Initial WebDAV client with PROPFIND and MKCOL support.
 - Multistatus XML parser with unit coverage.
 - `files list`, `files stat`, and `files mkdir --dry-run`.
@@ -65,7 +67,7 @@ Completed so far:
   `docs/NETWORK.md`, `docs/SMOKE.md`, and `docs/COMPATIBILITY.md`.
 - GitHub Actions CI for fmt, clippy, and tests.
 
-Validation that passed after the initial implementation:
+Validation that passed after the current implementation:
 
 ```bash
 cargo fmt --all
@@ -77,10 +79,9 @@ cargo run -q -p nextcloud-cli --bin nxc -- --version
 
 Important pending items before MVP:
 
-- Login Flow v2 auth.
+- Real-server Login Flow v2 smoke validation.
 - OS keyring credential backend.
-- Capability cache.
-- Real-server smoke validation.
+- Broader real-server smoke validation across auth, capabilities, and files.
 - Mock HTTP tests for WebDAV and OCS commands.
 - `files upload`, `files download`, and file search.
 - Shares, calendar, contacts, notes, Deck, activity, raw DAV/OCS commands.
@@ -658,13 +659,14 @@ nextcloud-cli commands schema
 nextcloud-cli config path
 nextcloud-cli config show
 nextcloud-cli config doctor
+nextcloud-cli auth login --server <url> --profile <name> --no-open
 nextcloud-cli auth add --server <url> --user <user> --profile <name> --app-password <password>
 nextcloud-cli auth status
 nextcloud-cli profiles list
 nextcloud-cli profiles show <name>
 nextcloud-cli profiles set-default <name>
 nextcloud-cli server status
-nextcloud-cli server capabilities
+nextcloud-cli server capabilities [--refresh]
 nextcloud-cli files list [path]
 nextcloud-cli files stat <path>
 nextcloud-cli files mkdir <path> --dry-run
@@ -680,9 +682,12 @@ Implementation notes:
 - Global `--dry-run`, `--no-color`, `--quiet`, `--verbose`, `--ca-bundle`,
   `--insecure`, and `--agent` remain pending. `files mkdir` has command-local
   `--dry-run`.
-- `auth add` is implemented. `auth login` remains pending.
-- Credential storage currently uses a local file backend with owner-only Unix
-  permissions. OS keyring support remains pending.
+- `auth login` and `auth add` are implemented. `auth login` has `--no-open` for
+  headless use.
+- Credential storage uses an abstraction with a local file backend and owner-only
+  Unix permissions. OS keyring support remains pending.
+- `server capabilities` uses a per-profile cache. `--refresh` bypasses and
+  rewrites the cache.
 - `update check` currently reports development placeholder metadata. Release
   discovery and `update apply` remain pending.
 
@@ -5013,22 +5018,25 @@ nextcloud-cli commands schema --format json
 
 ### 41.2 Phase 1: auth, profiles, and server detection
 
-Status: partial. Manual app-password auth, profiles, `auth status`,
-`server status`, and `server capabilities` are implemented. Login Flow v2, OS
-keyring storage, and capability cache remain pending.
+Status: partial. Login Flow v2, manual app-password auth, profiles,
+`auth status`, `server status`, `server capabilities`, `NEXTCLOUD_CLI_PROFILE`,
+and capability caching are implemented. OS keyring storage and real-server smoke
+validation remain pending.
 
 Deliverables:
 
-- Login Flow v2 auth: pending
+- Login Flow v2 auth: implemented through `auth login`; real-server smoke still
+  pending
 - manual app-password auth: implemented through `auth add`
-- secure credential storage abstraction: partial, local file backend implemented, OS
-  keyring pending
-- profile selection and ambiguity handling: partial, `--profile` and stored
-  default profile implemented, environment/profile ambiguity rules pending
+- secure credential storage abstraction: partial, abstraction and local file backend
+  implemented, OS keyring pending
+- profile selection and ambiguity handling: partial, `--profile`,
+  `NEXTCLOUD_CLI_PROFILE`, and stored default profile implemented; multiple-profile
+  ambiguity listing remains pending
 - `auth status`: implemented
 - `server status`: implemented
-- `server capabilities`: implemented
-- capability cache shape: pending
+- `server capabilities`: implemented with `--refresh`
+- capability cache shape: implemented per profile with 1 hour TTL
 
 Completion signal:
 

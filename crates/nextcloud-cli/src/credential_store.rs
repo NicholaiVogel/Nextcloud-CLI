@@ -12,18 +12,22 @@ const CREDENTIAL_FILE_NAME: &str = "credentials.json";
 
 #[derive(Debug, Clone)]
 pub struct CredentialStore {
-    path: PathBuf,
+    backend: FileCredentialBackend,
 }
 
 impl CredentialStore {
     pub fn new(config_dir: &Path) -> Self {
         Self {
-            path: config_dir.join(CREDENTIAL_FILE_NAME),
+            backend: FileCredentialBackend::new(config_dir),
         }
     }
 
     pub fn path(&self) -> &Path {
-        &self.path
+        self.backend.path()
+    }
+
+    pub fn backend_name(&self) -> &'static str {
+        self.backend.name()
     }
 
     pub fn put_app_password(
@@ -32,43 +36,42 @@ impl CredentialStore {
         username: &str,
         app_password: &str,
     ) -> CliResult<()> {
-        let mut file = self.load()?;
-        let now = Utc::now();
-        let existing_created_at = file
-            .credentials
-            .get(&credential.id)
-            .map(|item| item.created_at)
-            .unwrap_or(now);
-        file.credentials.insert(
-            credential.id.clone(),
-            StoredCredential {
-                id: credential.id.clone(),
-                service: credential.service.clone(),
-                username: username.to_owned(),
-                app_password: app_password.to_owned(),
-                created_at: existing_created_at,
-                updated_at: now,
-            },
-        );
-        self.save(&file)
+        self.backend
+            .put_app_password(credential, username, app_password)
     }
 
     pub fn get_app_password(&self, credential: &CredentialRef) -> CliResult<String> {
-        let file = self.load()?;
-        file.credentials
-            .get(&credential.id)
-            .map(|item| item.app_password.clone())
-            .ok_or_else(|| {
-                CoreError::CredentialNotFound {
-                    id: credential.id.clone(),
-                }
-                .into()
-            })
+        self.backend.get_app_password(credential)
     }
 
     pub fn has_credential(&self, credential: &CredentialRef) -> CliResult<bool> {
-        let file = self.load()?;
-        Ok(file.credentials.contains_key(&credential.id))
+        self.backend.has_credential(credential)
+    }
+}
+
+trait CredentialBackend {
+    fn name(&self) -> &'static str;
+    fn path(&self) -> &Path;
+    fn put_app_password(
+        &self,
+        credential: &CredentialRef,
+        username: &str,
+        app_password: &str,
+    ) -> CliResult<()>;
+    fn get_app_password(&self, credential: &CredentialRef) -> CliResult<String>;
+    fn has_credential(&self, credential: &CredentialRef) -> CliResult<bool>;
+}
+
+#[derive(Debug, Clone)]
+struct FileCredentialBackend {
+    path: PathBuf,
+}
+
+impl FileCredentialBackend {
+    fn new(config_dir: &Path) -> Self {
+        Self {
+            path: config_dir.join(CREDENTIAL_FILE_NAME),
+        }
     }
 
     fn load(&self) -> CliResult<CredentialFile> {
@@ -99,6 +102,61 @@ impl CredentialStore {
         })?;
         set_owner_only_permissions(&self.path)?;
         Ok(())
+    }
+}
+
+impl CredentialBackend for FileCredentialBackend {
+    fn name(&self) -> &'static str {
+        "local-file-0600"
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn put_app_password(
+        &self,
+        credential: &CredentialRef,
+        username: &str,
+        app_password: &str,
+    ) -> CliResult<()> {
+        let mut file = self.load()?;
+        let now = Utc::now();
+        let existing_created_at = file
+            .credentials
+            .get(&credential.id)
+            .map(|item| item.created_at)
+            .unwrap_or(now);
+        file.credentials.insert(
+            credential.id.clone(),
+            StoredCredential {
+                id: credential.id.clone(),
+                service: credential.service.clone(),
+                username: username.to_owned(),
+                app_password: app_password.to_owned(),
+                created_at: existing_created_at,
+                updated_at: now,
+            },
+        );
+        self.save(&file)
+    }
+
+    fn get_app_password(&self, credential: &CredentialRef) -> CliResult<String> {
+        let file = self.load()?;
+        file.credentials
+            .get(&credential.id)
+            .map(|item| item.app_password.clone())
+            .ok_or_else(|| {
+                CoreError::CredentialNotFound {
+                    id: credential.id.clone(),
+                }
+                .into()
+            })
+    }
+
+    fn has_credential(&self, credential: &CredentialRef) -> CliResult<bool> {
+        let file = self.load()?;
+        Ok(file.credentials.contains_key(&credential.id))
     }
 }
 

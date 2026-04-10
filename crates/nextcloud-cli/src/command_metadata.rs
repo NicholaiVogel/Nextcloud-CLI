@@ -36,6 +36,11 @@ pub fn command_schema() -> CommandSchema {
                 "ConfigDoctor",
             ),
             stable(
+                "auth login",
+                "Run Nextcloud Login Flow v2 and store the returned app password.",
+                "AuthLoginResult",
+            ),
+            stable(
                 "auth add",
                 "Add an app-password authenticated profile.",
                 "AuthAddResult",
