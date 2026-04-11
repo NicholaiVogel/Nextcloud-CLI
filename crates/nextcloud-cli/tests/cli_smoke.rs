@@ -13,6 +13,13 @@ fn commands_schema_is_json() -> Result<(), Box<dyn std::error::Error>> {
     let value: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(value["schema_version"], 1);
     assert!(value["commands"].as_array().expect("commands array").len() >= 8);
+    assert!(
+        value["commands"]
+            .as_array()
+            .expect("commands array")
+            .iter()
+            .any(|command| command["name"] == "shares list")
+    );
     Ok(())
 }
 
@@ -221,6 +228,18 @@ fn files_search_rejects_unsupported_mode() -> Result<(), Box<dyn std::error::Err
         .failure()
         .code(2)
         .stderr(predicate::str::contains("unsupported_search_mode"));
+
+    Ok(())
+}
+
+#[test]
+fn shares_list_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    Command::cargo_bin("nextcloud-cli")?
+        .args(["shares", "list", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--shared-with-me"))
+        .stdout(predicate::str::contains("--include-tags"));
 
     Ok(())
 }

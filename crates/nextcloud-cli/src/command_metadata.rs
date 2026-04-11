@@ -108,6 +108,11 @@ pub fn command_schema() -> CommandSchema {
                 "FilesDeleteResult",
             ),
             stable(
+                "shares list",
+                "List shares through the Nextcloud OCS files sharing API.",
+                "SharesListResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

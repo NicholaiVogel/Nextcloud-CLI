@@ -132,6 +132,7 @@ impl CliError {
             Self::UnsupportedSearchMode { .. } => 2,
             Self::ConfirmationRequired => 2,
             Self::LoginTimeout { .. } => 10,
+            Self::Core(nextcloud::Error::OcsStatus { .. }) => 6,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,
             Self::Core(nextcloud::Error::Http(_)) => 3,
             _ => 1,

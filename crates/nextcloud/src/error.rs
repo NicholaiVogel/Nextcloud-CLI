@@ -81,6 +81,13 @@ pub enum Error {
         body: String,
     },
 
+    #[error("OCS request failed with status {status_code}: {message}")]
+    OcsStatus {
+        status: String,
+        status_code: i64,
+        message: String,
+    },
+
     #[error("download byte count mismatch: expected {expected} bytes, wrote {actual} bytes")]
     DownloadSizeMismatch { expected: u64, actual: u64 },
 }
@@ -103,6 +110,7 @@ impl Error {
             Self::InvalidRemotePath { .. } => "invalid_remote_path",
             Self::Http(_) => "http_request_failed",
             Self::HttpStatus { .. } => "http_status_failed",
+            Self::OcsStatus { .. } => "ocs_status_failed",
             Self::DownloadSizeMismatch { .. } => "download_size_mismatch",
         }
     }

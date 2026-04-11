@@ -9,6 +9,8 @@ pub mod client;
 pub mod config_schema;
 pub mod error;
 pub mod models;
+pub mod ocs;
+pub mod shares;
 pub mod webdav;
 
 pub use auth::{
@@ -21,4 +23,6 @@ pub use config_schema::{
     CliConfig, ConfigPaths, ConfigStore, CredentialRef, Profile, ProfilePolicy,
 };
 pub use error::{Error, Result};
+pub use ocs::{OcsEnvelope, OcsMeta};
+pub use shares::{Share, ShareListOptions, SharesClient};
 pub use webdav::{WebDavClient, WebDavEntry};

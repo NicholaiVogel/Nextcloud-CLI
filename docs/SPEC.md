@@ -1431,7 +1431,9 @@ Expected output:
 Completion gate:
 
 - Tests cover no shares, link shares, user shares, path filter, OCS error envelope,
-  and permission errors.
+  and permission errors. Current implementation has unit coverage for link share
+  normalization, user share normalization, path filter request construction, OCS
+  error envelope mapping, and mocked OCS request headers.
 - Real-server smoke test lists shares after creating a fixture share.
 
 ### 11.3 `shares create --public`
@@ -5234,8 +5236,10 @@ nextcloud-cli files search report --search-mode name --format json
 
 Deliverables:
 
-- OCS client and envelope parser
-- `shares list`
+- OCS client and envelope parser: implemented for JSON OCS envelopes and error
+  status mapping
+- `shares list`: implemented with `--path`, `--shared-with-me`, and
+  `--include-tags`
 - `shares create --public`
 - `shares delete` / `shares revoke`
 - destructive action confirmation model

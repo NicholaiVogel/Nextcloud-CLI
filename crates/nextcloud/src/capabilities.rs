@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::client::NextcloudClient;
 use crate::error::Result;
+use crate::ocs::OcsEnvelope;
 
 #[derive(Debug, Clone)]
 pub struct CapabilitiesClient {
@@ -19,13 +20,16 @@ impl CapabilitiesClient {
     }
 
     pub async fn capabilities(&self) -> Result<ServerCapabilities> {
-        let envelope: OcsCapabilitiesEnvelope = self
+        let data: OcsCapabilitiesData = self
             .client
-            .get_ocs_json("ocs/v2.php/cloud/capabilities?format=json")
-            .await?;
+            .get_ocs_json::<OcsEnvelope<OcsCapabilitiesData>>(
+                "ocs/v2.php/cloud/capabilities?format=json",
+            )
+            .await?
+            .into_data()?;
         Ok(ServerCapabilities {
-            version: envelope.ocs.data.version,
-            capabilities: envelope.ocs.data.capabilities,
+            version: data.version,
+            capabilities: data.capabilities,
         })
     }
 }
@@ -50,16 +54,6 @@ pub struct ServerStatus {
 pub struct ServerCapabilities {
     pub version: Value,
     pub capabilities: Value,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct OcsCapabilitiesEnvelope {
-    ocs: OcsCapabilitiesBody,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct OcsCapabilitiesBody {
-    data: OcsCapabilitiesData,
 }
 
 #[derive(Debug, Clone, Deserialize)]

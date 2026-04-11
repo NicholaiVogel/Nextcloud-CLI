@@ -64,6 +64,7 @@ Implemented today:
 - profile creation, listing, inspection, and default selection
 - server status and capabilities
 - WebDAV file list, name search, stat, mkdir, upload, streaming download, and delete
+- OCS share listing
 - machine-readable command metadata with `commands schema`
 
 The canonical product contract lives in [`docs/SPEC.md`](docs/SPEC.md).
@@ -191,6 +192,7 @@ Current commands:
 | Profiles | `profiles list`, `profiles show <name>`, `profiles set-default <name>` |
 | Server | `server status`, `server capabilities [--refresh]` |
 | Files | `files list`, `files search`, `files stat`, `files mkdir`, `files upload`, `files download`, `files delete` |
+| Shares | `shares list` |
 | Updates | `update check` |
 
 See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the implemented command list and
@@ -309,6 +311,17 @@ nxc commands schema --format json | jq '.commands[].name'
 This is the main integration point for agents that need to discover available
 commands without parsing help text.
 
+### List shares
+
+```bash
+nxc --profile personal shares list
+nxc --profile personal shares list --path /Documents/report.pdf
+nxc --profile personal shares list --shared-with-me
+```
+
+`shares list` normalizes Nextcloud's OCS response into common share objects and
+does not create, modify, or revoke shares.
+
 ## Environment variables
 
 Implemented environment variables:
@@ -337,6 +350,7 @@ Implemented exit codes:
 | `1` | General error. |
 | `2` | CLI validation, profile selection, credential selection, path validation, or confirmation error. |
 | `3` | HTTP, authentication, or network request failure. |
+| `6` | OCS server error envelope. |
 | `10` | Login Flow v2 timeout. |
 
 The spec defines a richer exit-code contract for future command families.
@@ -419,10 +433,10 @@ More detailed smoke instructions live in [`docs/SMOKE.md`](docs/SMOKE.md).
 
 ## Roadmap
 
-The next phase is sharing and safety policy:
+Current Phase 3 work is sharing and safety policy:
 
-- OCS client and envelope parser
-- `shares list`
+- OCS client and envelope parser, implemented
+- `shares list`, implemented
 - public link creation with dry-run support
 - share revoke/delete with confirmation
 - per-profile policy enforcement

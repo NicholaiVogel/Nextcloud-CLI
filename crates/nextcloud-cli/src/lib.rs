@@ -17,13 +17,13 @@ use zeroize::Zeroizing;
 use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
     AuthAppPasswordArgs, AuthCommand, Cli, Command, CommandsCommand, ConfigCommand, FilesCommand,
-    ProfilesCommand, ServerCommand, UpdateCommand,
+    ProfilesCommand, ServerCommand, SharesCommand, UpdateCommand,
 };
 use credential_store::CredentialStore;
 use error::{CliError, CliResult};
 use nextcloud::{
     AppPasswordClient, CapabilitiesClient, CliConfig, ClientAuth, ConfigPaths, ConfigStore,
-    LoginFlowV2Client, NextcloudClient, Profile, ServerCapabilities, WebDavClient,
+    LoginFlowV2Client, NextcloudClient, Profile, ServerCapabilities, SharesClient, WebDavClient,
 };
 use output::{print_error, print_success};
 use serde::Serialize;
@@ -83,6 +83,15 @@ async fn run(cli: Cli) -> CliResult<Value> {
         }
         Command::Files(command) => {
             handle_files(
+                command,
+                selected_profile.as_deref(),
+                &store,
+                &credential_store,
+            )
+            .await
+        }
+        Command::Shares(command) => {
+            handle_shares(
                 command,
                 selected_profile.as_deref(),
                 &store,
@@ -358,6 +367,46 @@ fn read_account_password(
     }
 
     Err(CliError::MissingAccountPassword)
+}
+
+async fn handle_shares(
+    command: SharesCommand,
+    selected_profile: Option<&str>,
+    store: &ConfigStore,
+    credential_store: &CredentialStore,
+) -> CliResult<Value> {
+    let profile = store.selected_profile(selected_profile)?;
+    let app_password = credential_store.get_app_password(&profile.credential)?;
+    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let shares_client = SharesClient::new(client);
+
+    match command {
+        SharesCommand::List(args) => {
+            let path = args
+                .path
+                .as_deref()
+                .map(nextcloud::webdav::normalize_remote_path)
+                .transpose()?;
+            let shares = shares_client
+                .list(&nextcloud::ShareListOptions {
+                    path: path.clone(),
+                    shared_with_me: args.shared_with_me,
+                    include_tags: args.include_tags,
+                })
+                .await?;
+            let count = shares.len();
+
+            json_value(json!({
+                "profile": profile.name,
+                "server": profile.server.to_string(),
+                "path": path,
+                "shared_with_me": args.shared_with_me,
+                "include_tags": args.include_tags,
+                "shares": shares,
+                "count": count,
+            }))
+        }
+    }
 }
 
 async fn handle_files(

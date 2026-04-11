@@ -54,6 +54,9 @@ pub enum Command {
     Files(FilesCommand),
 
     #[command(subcommand)]
+    Shares(SharesCommand),
+
+    #[command(subcommand)]
     Update(UpdateCommand),
 }
 
@@ -235,6 +238,23 @@ pub struct FilesDeleteArgs {
 
     #[arg(long, default_value_t = false)]
     pub yes: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SharesCommand {
+    List(SharesListArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct SharesListArgs {
+    #[arg(long)]
+    pub path: Option<String>,
+
+    #[arg(long, default_value_t = false)]
+    pub shared_with_me: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub include_tags: bool,
 }
 
 #[derive(Debug, Subcommand)]

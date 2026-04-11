@@ -3,6 +3,7 @@ use url::Url;
 
 use crate::client::NextcloudClient;
 use crate::error::Result;
+use crate::ocs::OcsEnvelope;
 
 #[derive(Debug, Clone)]
 pub struct AppPasswordClient {
@@ -15,12 +16,15 @@ impl AppPasswordClient {
     }
 
     pub async fn create_app_password(&self) -> Result<AppPasswordCredentials> {
-        let response: OcsAppPasswordEnvelope = self
+        let data: OcsAppPasswordData = self
             .client
-            .get_ocs_json("ocs/v2.php/core/getapppassword?format=json")
-            .await?;
+            .get_ocs_json::<OcsEnvelope<OcsAppPasswordData>>(
+                "ocs/v2.php/core/getapppassword?format=json",
+            )
+            .await?
+            .into_data()?;
         Ok(AppPasswordCredentials {
-            app_password: response.ocs.data.app_password,
+            app_password: data.app_password,
         })
     }
 }
@@ -74,16 +78,6 @@ pub struct LoginFlowV2Credentials {
     pub login_name: String,
     #[serde(alias = "appPassword")]
     pub app_password: String,
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-struct OcsAppPasswordEnvelope {
-    ocs: OcsAppPasswordBody,
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-struct OcsAppPasswordBody {
-    data: OcsAppPasswordData,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -145,9 +139,9 @@ mod tests {
             }
         }"#;
 
-        let parsed: OcsAppPasswordEnvelope =
+        let parsed: OcsEnvelope<OcsAppPasswordData> =
             serde_json::from_str(raw).expect("valid OCS app password JSON");
-        assert_eq!(parsed.ocs.data.app_password, "generated-secret");
+        assert_eq!(parsed.into_data()?.app_password, "generated-secret");
         Ok(())
     }
 }
