@@ -4788,7 +4788,7 @@ release triples, downloads `nextcloud-cli-<version>-<triple>.tar.gz`, verifies
 SHA-256, extracts to `vendor/<triple>/`, supports
 `NEXTCLOUD_CLI_SKIP_DOWNLOAD=1`, and supports `NEXTCLOUD_CLI_BINARY` for local
 development. The runner attempts one installer recovery if the vendor binary is
-missing. Publishing remains pending until a matching GitHub release exists.
+missing. Version `0.1.0` is published on npm as `nextcloud-cli`.
 
 The npm package should contain:
 
@@ -5407,15 +5407,16 @@ nextcloud-cli activity recent --limit 20 --format json
 ### 41.7 Phase 6: distribution and agent experience
 
 Status: partial. README, install/config/network/smoke docs, CI, `nxc` alias,
-tagged GitHub release binary packaging, and placeholder `update check` are
-implemented. npm wrapper, curl installer, real self-update, skills, and terminal
-art remain pending.
+tagged GitHub release binary packaging, npm package publication, and placeholder
+`update check` are implemented. curl installer, real self-update, skills, and
+terminal art remain pending.
 
 Deliverables:
 
 - README quickstart: implemented for source/development workflow
-- install docs: partial, source install documented
-- npm wrapper: implemented locally under `npm/nextcloud-cli`, unpublished
+- install docs: partial, source, GitHub Release, and npm install documented
+- npm wrapper: implemented under `npm/nextcloud-cli` and published as
+  `nextcloud-cli`
 - curl installer: pending
 - GitHub Release artifact naming and checksum verification: implemented for
   tagged releases

@@ -31,8 +31,17 @@ Windows release assets are also `.tar.gz` archives with `.exe` binaries inside.
 
 ## npm wrapper
 
-The npm wrapper is implemented but should not be published until the first
-GitHub release exists for the matching package version.
+The npm package is published as `nextcloud-cli` and exposes both command names:
+
+```bash
+npm install -g nextcloud-cli
+nxc --help
+nextcloud-cli --help
+```
+
+During installation, the package downloads the matching GitHub release archive,
+verifies its SHA-256 checksum, and stores the native binaries under its package
+directory.
 
 Local development test:
 

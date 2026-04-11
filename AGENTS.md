@@ -87,8 +87,8 @@ convenience hacks.
   command metadata, CI, `nxc` alias, tagged GitHub release packaging, and
   placeholder `update check` exist. `smoke run` exists for safe redacted
   live-server health reports. The npm wrapper exists under `npm/nextcloud-cli`
-  but is not published yet. curl installer, real self-update, and agent skills
-  remain planned.
+  and is published as `nextcloud-cli`. curl installer, real self-update, and
+  agent skills remain planned.
 
 When continuing autonomously, complete the next smallest vertical slice,
 validate it, smoke it safely, commit it, push it, then update memory.
