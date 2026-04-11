@@ -1577,6 +1577,8 @@ Behavior:
 - `--from` and `--to` are explicit date/time bounds.
 - Recurring events should be expanded for the requested window where CalDAV
   response provides expansions.
+- Status: initial read-only implementation exists for CalDAV calendar discovery,
+  `calendar-query` REPORT, and basic VEVENT parsing.
 
 Expected output:
 
@@ -5285,7 +5287,8 @@ nextcloud-cli profiles policy show personal --format json
 Deliverables:
 
 - CalDAV discovery and range query
-- iCalendar parsing and serialization
+- iCalendar parsing: initial VEVENT parser implemented for read-only event
+  listing
 - calendar create/update/delete with dry-run and ETag behavior
 - CardDAV discovery and search
 - vCard parsing and serialization

@@ -143,6 +143,11 @@ pub fn command_schema() -> CommandSchema {
                 "SharesDeleteResult",
             ),
             stable(
+                "calendar events",
+                "List calendar events in a CalDAV time range.",
+                "CalendarEventsResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

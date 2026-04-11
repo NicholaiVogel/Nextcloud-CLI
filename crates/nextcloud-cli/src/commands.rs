@@ -57,6 +57,9 @@ pub enum Command {
     Shares(SharesCommand),
 
     #[command(subcommand)]
+    Calendar(CalendarCommand),
+
+    #[command(subcommand)]
     Update(UpdateCommand),
 }
 
@@ -323,6 +326,29 @@ pub struct SharesDeleteArgs {
 
     #[arg(long, default_value_t = false)]
     pub yes: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CalendarCommand {
+    Events(CalendarEventsArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct CalendarEventsArgs {
+    #[arg(long)]
+    pub date: Option<String>,
+
+    #[arg(long)]
+    pub range: Option<String>,
+
+    #[arg(long)]
+    pub from: Option<String>,
+
+    #[arg(long)]
+    pub to: Option<String>,
+
+    #[arg(long)]
+    pub calendar: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]

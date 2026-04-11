@@ -60,6 +60,12 @@ pub enum CliError {
     #[error("policy set did not include any changes")]
     NoPolicyChanges,
 
+    #[error("invalid calendar range `{value}`; expected values like 7d")]
+    InvalidCalendarRange { value: String },
+
+    #[error("invalid calendar bound `{value}`; expected YYYY-MM-DD or RFC3339 datetime")]
+    InvalidCalendarBound { value: String },
+
     #[error("failed to read credentials from {path}: {source}")]
     CredentialRead {
         path: PathBuf,
@@ -134,6 +140,8 @@ impl CliError {
             Self::InvalidExpireDate { .. } => "invalid_expire_date",
             Self::InvalidShareId { .. } => "invalid_share_id",
             Self::NoPolicyChanges => "no_policy_changes",
+            Self::InvalidCalendarRange { .. } => "invalid_calendar_range",
+            Self::InvalidCalendarBound { .. } => "invalid_calendar_bound",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
             Self::CredentialParse { .. } => "credential_parse_failed",
@@ -167,6 +175,8 @@ impl CliError {
             Self::InvalidExpireDate { .. } => 2,
             Self::InvalidShareId { .. } => 2,
             Self::NoPolicyChanges => 2,
+            Self::InvalidCalendarRange { .. } => 2,
+            Self::InvalidCalendarBound { .. } => 2,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::OcsStatus { .. }) => 6,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,

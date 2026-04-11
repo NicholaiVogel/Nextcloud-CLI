@@ -4,6 +4,7 @@
 //! data models, configuration layout, API clients, and protocol-specific helpers.
 
 pub mod auth;
+pub mod calendar;
 pub mod capabilities;
 pub mod client;
 pub mod config_schema;
@@ -17,6 +18,7 @@ pub use auth::{
     AppPasswordClient, AppPasswordCredentials, LoginFlowV2Client, LoginFlowV2Credentials,
     LoginFlowV2Poll, LoginFlowV2Start,
 };
+pub use calendar::{CalendarClient, CalendarEvent, CalendarEventsOptions};
 pub use capabilities::{CapabilitiesClient, ServerCapabilities, ServerStatus};
 pub use client::{ClientAuth, DownloadedBytes, NextcloudClient};
 pub use config_schema::{

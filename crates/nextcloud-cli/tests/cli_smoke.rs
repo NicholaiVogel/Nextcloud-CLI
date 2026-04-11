@@ -662,6 +662,63 @@ fn profile_policy_reset_requires_confirmation() -> Result<(), Box<dyn std::error
 }
 
 #[test]
+fn calendar_events_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    Command::cargo_bin("nextcloud-cli")?
+        .args(["calendar", "events", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--date"))
+        .stdout(predicate::str::contains("--range"))
+        .stdout(predicate::str::contains("--from"))
+        .stdout(predicate::str::contains("--to"));
+
+    Ok(())
+}
+
+#[test]
+fn calendar_events_rejects_bad_range_before_auth() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "calendar",
+            "events",
+            "--range",
+            "soon",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("invalid_calendar_range"));
+
+    Ok(())
+}
+
+#[test]
 fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
 

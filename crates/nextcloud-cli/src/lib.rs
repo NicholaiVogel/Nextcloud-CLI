@@ -6,8 +6,7 @@ mod credential_store;
 mod error;
 mod output;
 
-use chrono::NaiveDate;
-use chrono::Utc;
+use chrono::{DateTime, Days, Local, LocalResult, NaiveDate, TimeZone, Utc};
 use clap::Parser;
 use std::fs;
 use std::io::Read;
@@ -19,8 +18,9 @@ use zeroize::Zeroizing;
 use audit::{command_executed, record, remote_path_target, share_id_target, target};
 use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
-    AuthAppPasswordArgs, AuthCommand, Cli, Command, CommandsCommand, ConfigCommand, FilesCommand,
-    ProfilePolicySetArgs, ProfilesCommand, ServerCommand, SharesCommand, UpdateCommand,
+    AuthAppPasswordArgs, AuthCommand, CalendarCommand, CalendarEventsArgs, Cli, Command,
+    CommandsCommand, ConfigCommand, FilesCommand, ProfilePolicySetArgs, ProfilesCommand,
+    ServerCommand, SharesCommand, UpdateCommand,
 };
 use credential_store::CredentialStore;
 use error::{CliError, CliResult};
@@ -95,6 +95,15 @@ async fn run(cli: Cli) -> CliResult<Value> {
         }
         Command::Shares(command) => {
             handle_shares(
+                command,
+                selected_profile.as_deref(),
+                &store,
+                &credential_store,
+            )
+            .await
+        }
+        Command::Calendar(command) => {
+            handle_calendar(
                 command,
                 selected_profile.as_deref(),
                 &store,
@@ -1029,6 +1038,122 @@ fn partial_download_path(path: &Path) -> std::path::PathBuf {
     ))
 }
 
+async fn handle_calendar(
+    command: CalendarCommand,
+    selected_profile: Option<&str>,
+    store: &ConfigStore,
+    credential_store: &CredentialStore,
+) -> CliResult<Value> {
+    let profile = store.selected_profile(selected_profile)?;
+    let app_password = credential_store.get_app_password(&profile.credential)?;
+    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let calendar = nextcloud::CalendarClient::new(client, profile.username.clone());
+
+    match command {
+        CalendarCommand::Events(args) => {
+            let range = resolve_calendar_range(&args)?;
+            let events = calendar
+                .events(&nextcloud::CalendarEventsOptions {
+                    from: range.from,
+                    to: range.to,
+                    calendar: args.calendar.clone(),
+                })
+                .await?;
+            let count = events.len();
+            json_value(CalendarEventsOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                calendar: args.calendar,
+                range,
+                events,
+                count,
+            })
+        }
+    }
+}
+
+fn resolve_calendar_range(args: &CalendarEventsArgs) -> CliResult<CalendarRangeOutput> {
+    if let Some(date) = &args.date {
+        return resolve_calendar_date(date);
+    }
+
+    if let Some(range) = &args.range {
+        return resolve_calendar_duration(range);
+    }
+
+    if args.from.is_some() || args.to.is_some() {
+        let from = args
+            .from
+            .as_deref()
+            .map(parse_calendar_bound)
+            .transpose()?
+            .unwrap_or_else(Utc::now);
+        let to = args
+            .to
+            .as_deref()
+            .map(parse_calendar_bound)
+            .transpose()?
+            .unwrap_or_else(|| from + chrono::Duration::days(7));
+        return Ok(CalendarRangeOutput::new(from, to));
+    }
+
+    resolve_calendar_duration("7d")
+}
+
+fn resolve_calendar_date(value: &str) -> CliResult<CalendarRangeOutput> {
+    let date = if value == "today" {
+        Local::now().date_naive()
+    } else {
+        NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| {
+            CliError::InvalidCalendarBound {
+                value: value.to_owned(),
+            }
+        })?
+    };
+    let from = local_midnight_utc(date);
+    let to_date =
+        date.checked_add_days(Days::new(1))
+            .ok_or_else(|| CliError::InvalidCalendarBound {
+                value: value.to_owned(),
+            })?;
+    let to = local_midnight_utc(to_date);
+    Ok(CalendarRangeOutput::new(from, to))
+}
+
+fn local_midnight_utc(date: NaiveDate) -> DateTime<Utc> {
+    let midnight = date.and_hms_opt(0, 0, 0).expect("valid midnight");
+    match Local.from_local_datetime(&midnight) {
+        LocalResult::Single(datetime) => datetime.with_timezone(&Utc),
+        LocalResult::Ambiguous(earliest, _) => earliest.with_timezone(&Utc),
+        LocalResult::None => midnight.and_utc(),
+    }
+}
+
+fn resolve_calendar_duration(value: &str) -> CliResult<CalendarRangeOutput> {
+    let days = value
+        .strip_suffix('d')
+        .and_then(|days| days.parse::<i64>().ok())
+        .filter(|days| *days > 0)
+        .ok_or_else(|| CliError::InvalidCalendarRange {
+            value: value.to_owned(),
+        })?;
+    let from = Utc::now();
+    let to = from + chrono::Duration::days(days);
+    Ok(CalendarRangeOutput::new(from, to))
+}
+
+fn parse_calendar_bound(value: &str) -> CliResult<DateTime<Utc>> {
+    if let Ok(datetime) = DateTime::parse_from_rfc3339(value) {
+        return Ok(datetime.with_timezone(&Utc));
+    }
+    let date = NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| {
+        CliError::InvalidCalendarBound {
+            value: value.to_owned(),
+        }
+    })?;
+    Ok(date.and_hms_opt(0, 0, 0).expect("valid midnight").and_utc())
+}
+
 async fn handle_server(
     command: ServerCommand,
     selected_profile: Option<&str>,
@@ -1265,6 +1390,28 @@ struct FilesDeleteOutput {
     deleted: bool,
     confirmed: bool,
     entry: Option<nextcloud::WebDavEntry>,
+}
+
+#[derive(Debug, Serialize)]
+struct CalendarRangeOutput {
+    from: DateTime<Utc>,
+    to: DateTime<Utc>,
+}
+
+impl CalendarRangeOutput {
+    fn new(from: DateTime<Utc>, to: DateTime<Utc>) -> Self {
+        Self { from, to }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct CalendarEventsOutput {
+    profile: String,
+    server: String,
+    calendar: Option<String>,
+    range: CalendarRangeOutput,
+    events: Vec<nextcloud::CalendarEvent>,
+    count: usize,
 }
 
 #[derive(Debug, Serialize)]
