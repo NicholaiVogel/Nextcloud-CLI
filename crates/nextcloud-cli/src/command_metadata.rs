@@ -158,6 +158,11 @@ pub fn command_schema() -> CommandSchema {
                 "ContactsSearchResult",
             ),
             stable(
+                "contacts create",
+                "Create a contact through CardDAV PUT, with dry-run support.",
+                "ContactsCreateResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

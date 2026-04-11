@@ -25,7 +25,7 @@ pub use client::{ClientAuth, DownloadedBytes, NextcloudClient};
 pub use config_schema::{
     CliConfig, ConfigPaths, ConfigStore, CredentialRef, Profile, ProfilePolicy,
 };
-pub use contacts::{Contact, ContactSearchOptions, ContactsClient};
+pub use contacts::{Contact, ContactCreateOptions, ContactSearchOptions, ContactsClient};
 pub use error::{Error, Result};
 pub use ocs::{OcsEnvelope, OcsMeta};
 pub use shares::{Share, ShareCreatePublicOptions, ShareListOptions, SharesClient};

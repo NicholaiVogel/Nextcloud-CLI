@@ -879,6 +879,60 @@ fn contacts_search_rejects_bad_limit_before_network() -> Result<(), Box<dyn std:
 }
 
 #[test]
+fn contacts_create_dry_run_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "contacts",
+            "create",
+            "--addressbook",
+            "contacts",
+            "--full-name",
+            "Ada Lovelace",
+            "--email",
+            "ada@example.com",
+            "--phone",
+            "+15555550100",
+            "--organization",
+            "Analytical Engine",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dry_run\": true"))
+        .stdout(predicate::str::contains("\"created\": false"))
+        .stdout(predicate::str::contains("\"email_count\": 1"))
+        .stdout(predicate::str::contains("\"phone_count\": 1"));
+
+    Ok(())
+}
+
+#[test]
 fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
 

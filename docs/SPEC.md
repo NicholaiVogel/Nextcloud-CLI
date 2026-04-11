@@ -1787,6 +1787,9 @@ Behavior:
 - Support multiple `--email` and `--phone` flags.
 - Support `--dry-run`.
 - Return normalized contact metadata including href and ETag when available.
+- Status: initial implementation exists for dry-run previews and actual CardDAV
+  PUT creation. Dry-run output reports email/phone counts rather than echoing
+  full contact payloads.
 
 Completion gate:
 
@@ -5299,6 +5302,7 @@ Deliverables:
 - CardDAV discovery and search
 - vCard parsing: initial parser implemented for read-only contact search
 - contacts create/update/delete with dry-run and ETag behavior
+- contacts create: initial implementation exists
 
 Completion signal:
 

@@ -53,6 +53,28 @@ impl ContactsClient {
         Ok(contacts)
     }
 
+    pub async fn create(&self, options: &ContactCreateOptions) -> Result<Contact> {
+        let vcard = build_vcard(options);
+        let path = self.contact_path(&options.addressbook, &options.uid);
+        let etag = self
+            .client
+            .put_bytes(&path, vcard.into_bytes(), Some("text/vcard; charset=utf-8"))
+            .await?;
+
+        Ok(Contact {
+            uid: options.uid.clone(),
+            addressbook: options.addressbook.clone(),
+            addressbook_display_name: None,
+            full_name: Some(options.full_name.clone()),
+            emails: options.emails.clone(),
+            phones: options.phones.clone(),
+            organization: options.organization.clone(),
+            title: None,
+            href: Some(format!("/{}", path)),
+            etag,
+        })
+    }
+
     async fn discover_addressbooks(&self) -> Result<Vec<AddressBookRef>> {
         let body = r#"<?xml version="1.0" encoding="UTF-8"?>
 <d:propfind xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">
@@ -86,6 +108,15 @@ impl ContactsClient {
             encode_segment(addressbook)
         )
     }
+
+    fn contact_path(&self, addressbook: &str, uid: &str) -> String {
+        format!(
+            "remote.php/dav/addressbooks/users/{}/{}/{}.vcf",
+            encode_segment(&self.username),
+            encode_segment(addressbook),
+            encode_segment(uid)
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,6 +124,16 @@ pub struct ContactSearchOptions {
     pub query: String,
     pub limit: u32,
     pub addressbook: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContactCreateOptions {
+    pub addressbook: String,
+    pub uid: String,
+    pub full_name: String,
+    pub emails: Vec<String>,
+    pub phones: Vec<String>,
+    pub organization: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -389,6 +430,28 @@ fn build_addressbook_query(query: &str) -> String {
     )
 }
 
+pub fn build_vcard(options: &ContactCreateOptions) -> String {
+    let mut lines = vec![
+        "BEGIN:VCARD".to_owned(),
+        "VERSION:4.0".to_owned(),
+        format!("UID:{}", escape_vcard_text(&options.uid)),
+        format!("FN:{}", escape_vcard_text(&options.full_name)),
+    ];
+
+    for email in &options.emails {
+        lines.push(format!("EMAIL:{}", escape_vcard_text(email)));
+    }
+    for phone in &options.phones {
+        lines.push(format!("TEL:{}", escape_vcard_text(phone)));
+    }
+    if let Some(organization) = &options.organization {
+        lines.push(format!("ORG:{}", escape_vcard_text(organization)));
+    }
+
+    lines.push("END:VCARD".to_owned());
+    format!("{}\r\n", lines.join("\r\n"))
+}
+
 fn uid_from_href(href: &str) -> Option<String> {
     href.trim_end_matches('/')
         .rsplit('/')
@@ -419,6 +482,14 @@ fn unescape_vcard_value(value: &str) -> String {
         .replace("\\,", ",")
         .replace("\\;", ";")
         .replace("\\\\", "\\")
+}
+
+fn escape_vcard_text(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace(';', "\\;")
+        .replace(',', "\\,")
 }
 
 fn non_empty(value: String) -> Option<String> {
@@ -533,5 +604,24 @@ END:VCARD</card:address-data>
         );
         assert_eq!(contacts[0].etag.as_deref(), Some("abc"));
         Ok(())
+    }
+
+    #[test]
+    fn serializes_vcard() {
+        let vcard = build_vcard(&ContactCreateOptions {
+            addressbook: "contacts".to_owned(),
+            uid: "ada".to_owned(),
+            full_name: "Ada, Lovelace".to_owned(),
+            emails: vec!["ada@example.com".to_owned()],
+            phones: vec!["+15555550100".to_owned()],
+            organization: Some("Analytical Engine".to_owned()),
+        });
+
+        assert!(vcard.contains("BEGIN:VCARD"));
+        assert!(vcard.contains("UID:ada"));
+        assert!(vcard.contains("FN:Ada\\, Lovelace"));
+        assert!(vcard.contains("EMAIL:ada@example.com"));
+        assert!(vcard.contains("TEL:+15555550100"));
+        assert!(vcard.contains("ORG:Analytical Engine"));
     }
 }

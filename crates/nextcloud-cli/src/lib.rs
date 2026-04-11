@@ -1229,6 +1229,96 @@ async fn handle_contacts(
                 count,
             })
         }
+        ContactsCommand::Create(args) => {
+            let contact = build_contact_create_options(&args);
+            if args.dry_run {
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "contacts.create",
+                        true,
+                        "PUT",
+                        "/remote.php/dav/addressbooks/users/{username}/{addressbook}/{uid}.vcf",
+                        target([
+                            ("addressbook", json!(contact.addressbook.clone())),
+                            ("uid", json!(contact.uid.clone())),
+                            ("full_name", json!(contact.full_name.clone())),
+                            ("email_count", json!(contact.emails.len())),
+                            ("phone_count", json!(contact.phones.len())),
+                            (
+                                "organization_present",
+                                json!(contact.organization.is_some()),
+                            ),
+                        ]),
+                    ),
+                );
+                return json_value(ContactsCreateOutput {
+                    profile: profile.name,
+                    server: profile.server.to_string(),
+                    dry_run: true,
+                    created: false,
+                    contact: ContactsCreatePreview {
+                        uid: contact.uid,
+                        addressbook: contact.addressbook,
+                        full_name: contact.full_name,
+                        email_count: contact.emails.len(),
+                        phone_count: contact.phones.len(),
+                        organization_present: contact.organization.is_some(),
+                    },
+                });
+            }
+
+            let created = contacts.create(&contact).await?;
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "contacts.create",
+                    false,
+                    "PUT",
+                    "/remote.php/dav/addressbooks/users/{username}/{addressbook}/{uid}.vcf",
+                    target([
+                        ("addressbook", json!(contact.addressbook)),
+                        ("uid", json!(contact.uid)),
+                        ("full_name", json!(contact.full_name)),
+                        ("email_count", json!(contact.emails.len())),
+                        ("phone_count", json!(contact.phones.len())),
+                        (
+                            "organization_present",
+                            json!(contact.organization.is_some()),
+                        ),
+                    ]),
+                ),
+            );
+            json_value(json!({
+                "profile": profile.name,
+                "server": profile.server.to_string(),
+                "dry_run": false,
+                "created": true,
+                "contact": created,
+            }))
+        }
+    }
+}
+
+fn build_contact_create_options(
+    args: &commands::ContactsCreateArgs,
+) -> nextcloud::ContactCreateOptions {
+    let uid = format!(
+        "nextcloud-cli-{}-{}",
+        std::process::id(),
+        Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    );
+    nextcloud::ContactCreateOptions {
+        addressbook: args.addressbook.clone(),
+        uid,
+        full_name: args.full_name.clone(),
+        emails: args.email.clone(),
+        phones: args.phone.clone(),
+        organization: args.organization.clone(),
     }
 }
 
@@ -1604,6 +1694,25 @@ struct ContactsSearchOutput {
     limit: u32,
     contacts: Vec<nextcloud::Contact>,
     count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct ContactsCreateOutput {
+    profile: String,
+    server: String,
+    dry_run: bool,
+    created: bool,
+    contact: ContactsCreatePreview,
+}
+
+#[derive(Debug, Serialize)]
+struct ContactsCreatePreview {
+    uid: String,
+    addressbook: String,
+    full_name: String,
+    email_count: usize,
+    phone_count: usize,
+    organization_present: bool,
 }
 
 #[derive(Debug, Serialize)]

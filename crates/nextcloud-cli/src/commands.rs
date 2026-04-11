@@ -385,6 +385,7 @@ pub struct CalendarCreateArgs {
 #[derive(Debug, Subcommand)]
 pub enum ContactsCommand {
     Search(ContactsSearchArgs),
+    Create(ContactsCreateArgs),
 }
 
 #[derive(Debug, Args)]
@@ -396,6 +397,27 @@ pub struct ContactsSearchArgs {
 
     #[arg(long)]
     pub addressbook: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct ContactsCreateArgs {
+    #[arg(long)]
+    pub addressbook: String,
+
+    #[arg(long)]
+    pub full_name: String,
+
+    #[arg(long)]
+    pub email: Vec<String>,
+
+    #[arg(long)]
+    pub phone: Vec<String>,
+
+    #[arg(long)]
+    pub organization: Option<String>,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Subcommand)]
