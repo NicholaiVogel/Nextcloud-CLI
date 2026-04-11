@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://nextcloud.com/c/uploads/2025/10/Nextcloud-logo-blue.png?original" alt="Nextcloud" height="72" align="center" />
+  <img src="https://nextcloud.com/c/uploads/2025/10/Nextcloud-logo-blue.png?original" alt="Nextcloud" height="96" align="center" />
   &nbsp;nxc
 </h1>
 
