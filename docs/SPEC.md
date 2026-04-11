@@ -4783,12 +4783,12 @@ CLI command names must remain `nextcloud-cli` and `nxc` regardless of package
 name.
 
 Status: initial npm wrapper package is implemented under `npm/nextcloud-cli`.
-It exposes `nextcloud-cli` and `nxc`, maps Node platforms to release triples,
-downloads `nextcloud-cli-<version>-<triple>.tar.gz`, verifies SHA-256, extracts
-to `vendor/<triple>/`, supports `NEXTCLOUD_CLI_SKIP_DOWNLOAD=1`, and supports
-`NEXTCLOUD_CLI_BINARY` for local development. The runner attempts one installer
-recovery if the vendor binary is missing. Publishing remains pending until a
-matching GitHub release exists.
+It exposes `nextcloud-cli` and `nxc`, maps currently published Node platforms to
+release triples, downloads `nextcloud-cli-<version>-<triple>.tar.gz`, verifies
+SHA-256, extracts to `vendor/<triple>/`, supports
+`NEXTCLOUD_CLI_SKIP_DOWNLOAD=1`, and supports `NEXTCLOUD_CLI_BINARY` for local
+development. The runner attempts one installer recovery if the vendor binary is
+missing. Publishing remains pending until a matching GitHub release exists.
 
 The npm package should contain:
 
@@ -4812,13 +4812,17 @@ Required behavior:
 - If the binary is missing, `run.js` attempts reinstall before failing.
 - Installer errors are sanitized and must not expose environment secrets.
 
-Supported platform mapping should follow the reference CLI pattern:
+Initial supported npm platform mapping:
 
 - `Darwin` + `x64` -> `x86_64-apple-darwin`
 - `Darwin` + `arm64` -> `aarch64-apple-darwin`
-- `Linux` + `x64` -> `x86_64-unknown-linux-gnu` or musl when detected
-- `Linux` + `arm64` -> `aarch64-unknown-linux-gnu` or musl when detected
+- `Linux` + `x64` -> `x86_64-unknown-linux-gnu`
 - `Windows_NT` + `x64` -> `x86_64-pc-windows-msvc`
+
+Linux arm64, musl Linux, and Windows arm64 should be added only when matching
+release assets are published. The installer should fail with an honest
+unsupported-platform message rather than mapping to an asset that does not
+exist.
 
 The npm wrapper must expose both commands:
 

@@ -6,6 +6,7 @@ const { binaryName, platformTriple } = require("../lib/platform");
 
 test("maps supported platforms to Rust host triples", () => {
   assert.equal(platformTriple("linux", "x64"), "x86_64-unknown-linux-gnu");
+  assert.equal(platformTriple("darwin", "x64"), "x86_64-apple-darwin");
   assert.equal(platformTriple("darwin", "arm64"), "aarch64-apple-darwin");
   assert.equal(platformTriple("win32", "x64"), "x86_64-pc-windows-msvc");
 });
@@ -17,4 +18,6 @@ test("adds exe suffix for Windows binaries", () => {
 
 test("rejects unsupported platforms", () => {
   assert.throws(() => platformTriple("freebsd", "x64"), /Unsupported platform/);
+  assert.throws(() => platformTriple("linux", "arm64"), /Unsupported platform/);
+  assert.throws(() => platformTriple("win32", "arm64"), /Unsupported platform/);
 });
