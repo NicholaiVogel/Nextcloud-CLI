@@ -44,4 +44,5 @@ detection, core WebDAV file-transfer commands, and initial OCS share listing:
 - `contacts delete --addressbook <name> <uid> [--dry-run] [--yes]`
 - `activity recent [--limit <n>]`
 - `notes list [--category <name>] [--exclude-content] [--limit <n>]`
+- `deck boards [--details]`
 - `update check`

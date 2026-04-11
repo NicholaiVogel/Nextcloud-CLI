@@ -69,6 +69,9 @@ pub enum Command {
     Notes(NotesCommand),
 
     #[command(subcommand)]
+    Deck(DeckCommand),
+
+    #[command(subcommand)]
     Update(UpdateCommand),
 }
 
@@ -482,6 +485,17 @@ pub struct NotesListArgs {
 
     #[arg(long, default_value_t = 25)]
     pub limit: u32,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DeckCommand {
+    Boards(DeckBoardsArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct DeckBoardsArgs {
+    #[arg(long, default_value_t = false)]
+    pub details: bool,
 }
 
 #[derive(Debug, Subcommand)]

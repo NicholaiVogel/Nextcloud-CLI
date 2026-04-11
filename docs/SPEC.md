@@ -2029,6 +2029,9 @@ Behavior:
 - Send `Content-Type: application/json`.
 - If `--details` is set, request detailed board information where supported.
 - If Deck is unavailable, return `app_unavailable` with source `deck`.
+- Status: `deck boards [--details]` is implemented for the Deck API board list
+  endpoint. Detailed expansion is currently accepted as an output flag but uses
+  the same list endpoint until a server-specific details parameter is confirmed.
 
 Expected output:
 
@@ -5325,7 +5328,7 @@ nextcloud-cli calendar create --calendar personal --summary Test --starts-at 202
 Deliverables:
 
 - Notes read/write commands: `notes list` implemented
-- Deck board, stack, and card commands
+- Deck board, stack, and card commands: `deck boards` implemented
 - Activity feed command: implemented for `activity recent --limit <n>`
 - optional app unavailable mapping
 - smoke report fields for enabled and unavailable apps

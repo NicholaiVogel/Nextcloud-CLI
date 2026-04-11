@@ -1149,6 +1149,17 @@ fn notes_list_help_and_limit_validation() -> Result<(), Box<dyn std::error::Erro
 }
 
 #[test]
+fn deck_boards_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    Command::cargo_bin("nextcloud-cli")?
+        .args(["deck", "boards", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--details"));
+
+    Ok(())
+}
+
+#[test]
 fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
 

@@ -10,6 +10,7 @@ pub mod capabilities;
 pub mod client;
 pub mod config_schema;
 pub mod contacts;
+pub mod deck;
 pub mod error;
 pub mod models;
 pub mod notes;
@@ -29,6 +30,7 @@ pub use config_schema::{
     CliConfig, ConfigPaths, ConfigStore, CredentialRef, Profile, ProfilePolicy,
 };
 pub use contacts::{Contact, ContactCreateOptions, ContactSearchOptions, ContactsClient};
+pub use deck::{DeckBoard, DeckClient};
 pub use error::{Error, Result};
 pub use notes::{Note, NotesClient, NotesListOptions};
 pub use ocs::{OcsEnvelope, OcsMeta};

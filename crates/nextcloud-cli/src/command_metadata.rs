@@ -183,6 +183,11 @@ pub fn command_schema() -> CommandSchema {
                 "NotesListResult",
             ),
             stable(
+                "deck boards",
+                "List Deck boards through the Nextcloud Deck API.",
+                "DeckBoardsResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

@@ -19,8 +19,9 @@ use audit::{command_executed, record, remote_path_target, share_id_target, targe
 use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
     ActivityCommand, AuthAppPasswordArgs, AuthCommand, CalendarCommand, CalendarEventsArgs, Cli,
-    Command, CommandsCommand, ConfigCommand, ContactsCommand, FilesCommand, NotesCommand,
-    ProfilePolicySetArgs, ProfilesCommand, ServerCommand, SharesCommand, UpdateCommand,
+    Command, CommandsCommand, ConfigCommand, ContactsCommand, DeckCommand, FilesCommand,
+    NotesCommand, ProfilePolicySetArgs, ProfilesCommand, ServerCommand, SharesCommand,
+    UpdateCommand,
 };
 use credential_store::CredentialStore;
 use error::{CliError, CliResult};
@@ -131,6 +132,15 @@ async fn run(cli: Cli) -> CliResult<Value> {
         }
         Command::Notes(command) => {
             handle_notes(
+                command,
+                selected_profile.as_deref(),
+                &store,
+                &credential_store,
+            )
+            .await
+        }
+        Command::Deck(command) => {
+            handle_deck(
                 command,
                 selected_profile.as_deref(),
                 &store,
@@ -1538,6 +1548,41 @@ async fn handle_notes(
     }
 }
 
+async fn handle_deck(
+    command: DeckCommand,
+    selected_profile: Option<&str>,
+    store: &ConfigStore,
+    credential_store: &CredentialStore,
+) -> CliResult<Value> {
+    let profile = store.selected_profile(selected_profile)?;
+    let app_password = credential_store.get_app_password(&profile.credential)?;
+    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let deck = nextcloud::DeckClient::new(client);
+
+    match command {
+        DeckCommand::Boards(args) => {
+            let boards = match deck.boards().await {
+                Ok(boards) => boards,
+                Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
+                    return Err(CliError::AppUnavailable {
+                        app: "deck".to_owned(),
+                        api_source: "deck".to_owned(),
+                    });
+                }
+                Err(error) => return Err(error.into()),
+            };
+            let count = boards.len();
+            json_value(DeckBoardsOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                details: args.details,
+                boards,
+                count,
+            })
+        }
+    }
+}
+
 fn resolve_calendar_range(args: &CalendarEventsArgs) -> CliResult<CalendarRangeOutput> {
     if let Some(date) = &args.date {
         return resolve_calendar_date(date);
@@ -1948,6 +1993,15 @@ struct NotesListOutput {
     exclude_content: bool,
     limit: u32,
     notes: Vec<nextcloud::Note>,
+    count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckBoardsOutput {
+    profile: String,
+    server: String,
+    details: bool,
+    boards: Vec<nextcloud::DeckBoard>,
     count: usize,
 }
 
