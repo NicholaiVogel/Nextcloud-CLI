@@ -183,6 +183,11 @@ pub fn command_schema() -> CommandSchema {
                 "NotesListResult",
             ),
             stable(
+                "notes create",
+                "Create a note through the Nextcloud Notes API, with dry-run support.",
+                "NotesCreateResult",
+            ),
+            stable(
                 "deck boards",
                 "List Deck boards through the Nextcloud Deck API.",
                 "DeckBoardsResult",

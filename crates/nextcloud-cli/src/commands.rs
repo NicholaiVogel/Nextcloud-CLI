@@ -473,6 +473,7 @@ pub struct ActivityRecentArgs {
 #[derive(Debug, Subcommand)]
 pub enum NotesCommand {
     List(NotesListArgs),
+    Create(NotesCreateArgs),
 }
 
 #[derive(Debug, Args)]
@@ -485,6 +486,24 @@ pub struct NotesListArgs {
 
     #[arg(long, default_value_t = 25)]
     pub limit: u32,
+}
+
+#[derive(Debug, Args)]
+pub struct NotesCreateArgs {
+    #[arg(long)]
+    pub title: String,
+
+    #[arg(long)]
+    pub content: Option<String>,
+
+    #[arg(long)]
+    pub from_file: Option<PathBuf>,
+
+    #[arg(long)]
+    pub category: Option<String>,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Subcommand)]

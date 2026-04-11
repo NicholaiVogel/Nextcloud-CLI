@@ -197,7 +197,7 @@ Current commands:
 | Calendar | `calendar events`, `calendar create`, `calendar delete` |
 | Contacts | `contacts search`, `contacts create`, `contacts delete` |
 | Activity | `activity recent` |
-| Notes | `notes list` |
+| Notes | `notes list`, `notes create` |
 | Deck | `deck boards`, `deck cards` |
 | Updates | `update check` |
 

@@ -1923,6 +1923,9 @@ Behavior:
 - Do not print full note content in agent-safe mode unless requested.
 - Support `--dry-run`.
 - If Notes is unavailable, return `app_unavailable` with source `notes`.
+- Status: `notes create` is implemented for `--title`, `--content`,
+  `--from-file`, `--category`, and `--dry-run`. Write output summarizes content
+  presence and byte count without printing the note body.
 
 Completion gate:
 
@@ -5330,7 +5333,7 @@ nextcloud-cli calendar create --calendar personal --summary Test --starts-at 202
 
 Deliverables:
 
-- Notes read/write commands: `notes list` implemented
+- Notes read/write commands: `notes list` and `notes create` implemented
 - Deck board, stack, and card commands: `deck boards` and `deck cards`
   implemented for read-only board/card listing
 - Activity feed command: implemented for `activity recent --limit <n>`
@@ -5341,6 +5344,7 @@ Completion signal:
 
 ```bash
 nextcloud-cli notes list --exclude-content --format json
+nextcloud-cli notes create --title "Smoke" --content "test" --dry-run --format json
 nextcloud-cli deck boards --format json
 nextcloud-cli deck cards --board 1 --format json
 nextcloud-cli activity recent --limit 20 --format json

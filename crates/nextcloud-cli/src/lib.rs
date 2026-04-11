@@ -1545,7 +1545,103 @@ async fn handle_notes(
                 count,
             })
         }
+        NotesCommand::Create(args) => {
+            let note = build_note_create_options(&args)?;
+            if args.dry_run {
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "notes.create",
+                        true,
+                        "POST",
+                        "/index.php/apps/notes/api/v1/notes",
+                        target([
+                            ("title", json!(note.title.clone())),
+                            ("category", json!(note.category.clone())),
+                            ("content_present", json!(note.content.is_some())),
+                            (
+                                "content_bytes",
+                                json!(note.content.as_ref().map(|content| content.len())),
+                            ),
+                        ]),
+                    ),
+                );
+                return json_value(NotesCreateOutput {
+                    profile: profile.name,
+                    server: profile.server.to_string(),
+                    dry_run: true,
+                    created: false,
+                    note: NoteWriteSummary::from_create_options(&note),
+                });
+            }
+
+            let created = match notes_client.create(&note).await {
+                Ok(note) => note,
+                Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
+                    return Err(CliError::AppUnavailable {
+                        app: "notes".to_owned(),
+                        api_source: "notes".to_owned(),
+                    });
+                }
+                Err(error) => return Err(error.into()),
+            };
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "notes.create",
+                    false,
+                    "POST",
+                    "/index.php/apps/notes/api/v1/notes",
+                    target([
+                        ("note_id", json!(created.id.clone())),
+                        ("title", json!(created.title.clone())),
+                        ("category", json!(created.category.clone())),
+                        ("content_present", json!(created.content.is_some())),
+                    ]),
+                ),
+            );
+            json_value(NotesCreateOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                dry_run: false,
+                created: true,
+                note: NoteWriteSummary::from_note(&created),
+            })
+        }
     }
+}
+
+fn build_note_create_options(
+    args: &commands::NotesCreateArgs,
+) -> CliResult<nextcloud::NotesCreateOptions> {
+    let content = resolve_note_content(args.content.clone(), args.from_file.as_deref())?;
+    Ok(nextcloud::NotesCreateOptions {
+        title: args.title.clone(),
+        content,
+        category: args.category.clone(),
+    })
+}
+
+fn resolve_note_content(
+    inline: Option<String>,
+    from_file: Option<&Path>,
+) -> CliResult<Option<String>> {
+    if inline.is_some() && from_file.is_some() {
+        return Err(CliError::ConflictingNoteContentSources);
+    }
+    if let Some(path) = from_file {
+        return fs::read_to_string(path)
+            .map(Some)
+            .map_err(|source| CliError::LocalFileRead {
+                path: path.to_path_buf(),
+                source,
+            });
+    }
+    Ok(inline)
 }
 
 async fn handle_deck(
@@ -2021,6 +2117,57 @@ struct NotesListOutput {
     limit: u32,
     notes: Vec<nextcloud::Note>,
     count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct NotesCreateOutput {
+    profile: String,
+    server: String,
+    dry_run: bool,
+    created: bool,
+    note: NoteWriteSummary,
+}
+
+#[derive(Debug, Serialize)]
+struct NoteWriteSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    etag: Option<String>,
+    title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    category: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modified_at: Option<String>,
+    content_present: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content_bytes: Option<usize>,
+}
+
+impl NoteWriteSummary {
+    fn from_create_options(options: &nextcloud::NotesCreateOptions) -> Self {
+        Self {
+            id: None,
+            etag: None,
+            title: options.title.clone(),
+            category: options.category.clone(),
+            modified_at: None,
+            content_present: options.content.is_some(),
+            content_bytes: options.content.as_ref().map(|content| content.len()),
+        }
+    }
+
+    fn from_note(note: &nextcloud::Note) -> Self {
+        Self {
+            id: Some(note.id.clone()),
+            etag: note.etag.clone(),
+            title: note.title.clone().unwrap_or_default(),
+            category: note.category.clone(),
+            modified_at: note.modified_at.clone(),
+            content_present: note.content.is_some(),
+            content_bytes: note.content.as_ref().map(|content| content.len()),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

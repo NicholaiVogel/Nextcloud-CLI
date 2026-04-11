@@ -25,6 +25,13 @@ pub enum CliError {
     #[error("local upload path {path} is not a file")]
     LocalUploadNotFile { path: PathBuf },
 
+    #[error("failed to read local file {path}: {source}")]
+    LocalFileRead {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("remote path {path} already exists; pass --overwrite to replace it")]
     RemotePathExists { path: String },
 
@@ -71,6 +78,9 @@ pub enum CliError {
 
     #[error("calendar event end must be after start")]
     InvalidCalendarEventRange,
+
+    #[error("pass only one note content source: --content or --from-file")]
+    ConflictingNoteContentSources,
 
     #[error("Nextcloud app `{app}` is unavailable for source `{api_source}`")]
     AppUnavailable { app: String, api_source: String },
@@ -140,6 +150,7 @@ impl CliError {
             Self::PasswordStdinRead(_) => "password_stdin_read_failed",
             Self::LocalFileExists { .. } => "local_file_exists",
             Self::LocalUploadNotFile { .. } => "local_upload_not_file",
+            Self::LocalFileRead { .. } => "local_file_read_failed",
             Self::RemotePathExists { .. } => "remote_path_exists",
             Self::UnsupportedSearchMode { .. } => "unsupported_search_mode",
             Self::ConfirmationRequired => "confirmation_required",
@@ -153,6 +164,7 @@ impl CliError {
             Self::InvalidCalendarBound { .. } => "invalid_calendar_bound",
             Self::InvalidLimit { .. } => "invalid_limit",
             Self::InvalidCalendarEventRange => "invalid_calendar_event_range",
+            Self::ConflictingNoteContentSources => "conflicting_note_content_sources",
             Self::AppUnavailable { .. } => "app_unavailable",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
@@ -178,6 +190,7 @@ impl CliError {
             Self::PasswordEnvMissing { .. } => 2,
             Self::LocalFileExists { .. } => 2,
             Self::LocalUploadNotFile { .. } => 2,
+            Self::LocalFileRead { .. } => 2,
             Self::RemotePathExists { .. } => 2,
             Self::UnsupportedSearchMode { .. } => 2,
             Self::ConfirmationRequired => 2,
@@ -191,6 +204,7 @@ impl CliError {
             Self::InvalidCalendarBound { .. } => 2,
             Self::InvalidLimit { .. } => 2,
             Self::InvalidCalendarEventRange => 2,
+            Self::ConflictingNoteContentSources => 2,
             Self::AppUnavailable { .. } => 6,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::OcsStatus { .. }) => 6,

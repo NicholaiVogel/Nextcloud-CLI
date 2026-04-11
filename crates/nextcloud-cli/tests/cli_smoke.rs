@@ -1149,6 +1149,52 @@ fn notes_list_help_and_limit_validation() -> Result<(), Box<dyn std::error::Erro
 }
 
 #[test]
+fn notes_create_dry_run_does_not_print_content() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "notes",
+            "create",
+            "--title",
+            "Smoke",
+            "--content",
+            "private note body",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"content_present\": true"))
+        .stdout(predicate::str::contains("private note body").not());
+
+    Ok(())
+}
+
+#[test]
 fn deck_boards_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
     Command::cargo_bin("nextcloud-cli")?
         .args(["deck", "boards", "--help"])

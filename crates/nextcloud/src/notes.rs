@@ -1,4 +1,5 @@
 use chrono::{DateTime, SecondsFormat, Utc};
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use url::form_urlencoded;
@@ -43,6 +44,22 @@ impl NotesClient {
         notes.truncate(options.limit.clamp(1, 100) as usize);
         Ok(notes)
     }
+
+    pub async fn create(&self, options: &NotesCreateOptions) -> Result<Note> {
+        let raw: RawNote = self
+            .client
+            .request_json(
+                Method::POST,
+                NOTES_ENDPOINT,
+                &NotesCreateRequest {
+                    title: Some(options.title.as_str()),
+                    content: options.content.as_deref(),
+                    category: options.category.as_deref(),
+                },
+            )
+            .await?;
+        Ok(Note::from(raw))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +67,13 @@ pub struct NotesListOptions {
     pub category: Option<String>,
     pub exclude_content: bool,
     pub limit: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotesCreateOptions {
+    pub title: String,
+    pub content: Option<String>,
+    pub category: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -75,6 +99,16 @@ pub struct Note {
 struct RawNote {
     #[serde(flatten)]
     fields: Map<String, Value>,
+}
+
+#[derive(Debug, Serialize)]
+struct NotesCreateRequest<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    category: Option<&'a str>,
 }
 
 impl From<RawNote> for Note {
@@ -176,6 +210,20 @@ mod tests {
             Some("2026-04-10T15:04:05Z")
         );
         assert!(notes[0].favorite);
+        Ok(())
+    }
+
+    #[test]
+    fn serializes_create_request_without_missing_fields() -> Result<()> {
+        let body = NotesCreateRequest {
+            title: Some("Plan"),
+            content: None,
+            category: Some("work"),
+        };
+        let value = serde_json::to_value(body).expect("serializes");
+        assert_eq!(value["title"], "Plan");
+        assert_eq!(value["category"], "work");
+        assert!(value.get("content").is_none());
         Ok(())
     }
 }
