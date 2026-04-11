@@ -61,6 +61,22 @@ impl NotesClient {
         Ok(Note::from(raw))
     }
 
+    pub async fn update(&self, options: &NotesUpdateOptions) -> Result<Note> {
+        let path = format!("{NOTES_ENDPOINT}/{}", options.id);
+        let raw: RawNote = self
+            .client
+            .request_json(
+                Method::PUT,
+                &path,
+                &NotesUpdateRequest {
+                    title: options.title.as_deref(),
+                    content: options.content.as_deref(),
+                },
+            )
+            .await?;
+        Ok(Note::from(raw))
+    }
+
     pub async fn delete(&self, id: &str) -> Result<()> {
         let path = format!("{NOTES_ENDPOINT}/{id}");
         self.client
@@ -82,6 +98,13 @@ pub struct NotesCreateOptions {
     pub title: String,
     pub content: Option<String>,
     pub category: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotesUpdateOptions {
+    pub id: String,
+    pub title: Option<String>,
+    pub content: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -117,6 +140,14 @@ struct NotesCreateRequest<'a> {
     content: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     category: Option<&'a str>,
+}
+
+#[derive(Debug, Serialize)]
+struct NotesUpdateRequest<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<&'a str>,
 }
 
 impl From<RawNote> for Note {
@@ -231,6 +262,18 @@ mod tests {
         let value = serde_json::to_value(body).expect("serializes");
         assert_eq!(value["title"], "Plan");
         assert_eq!(value["category"], "work");
+        assert!(value.get("content").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn serializes_update_request_with_partial_fields() -> Result<()> {
+        let body = NotesUpdateRequest {
+            title: Some("Updated"),
+            content: None,
+        };
+        let value = serde_json::to_value(body).expect("serializes");
+        assert_eq!(value["title"], "Updated");
         assert!(value.get("content").is_none());
         Ok(())
     }

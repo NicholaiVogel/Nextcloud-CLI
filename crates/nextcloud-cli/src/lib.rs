@@ -1612,6 +1612,72 @@ async fn handle_notes(
                 note: NoteWriteSummary::from_note(&created),
             })
         }
+        NotesCommand::Update(args) => {
+            let note = build_note_update_options(&args)?;
+            if args.dry_run {
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "notes.update",
+                        true,
+                        "PUT",
+                        "/index.php/apps/notes/api/v1/notes/{note-id}",
+                        target([
+                            ("note_id", json!(note.id.clone())),
+                            ("title", json!(note.title.clone())),
+                            ("content_present", json!(note.content.is_some())),
+                            (
+                                "content_bytes",
+                                json!(note.content.as_ref().map(|content| content.len())),
+                            ),
+                        ]),
+                    ),
+                );
+                return json_value(NotesUpdateOutput {
+                    profile: profile.name,
+                    server: profile.server.to_string(),
+                    dry_run: true,
+                    updated: false,
+                    note: NoteWriteSummary::from_update_options(&note),
+                });
+            }
+
+            let updated = match notes_client.update(&note).await {
+                Ok(note) => note,
+                Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
+                    return Err(CliError::AppUnavailable {
+                        app: "notes".to_owned(),
+                        api_source: "notes".to_owned(),
+                    });
+                }
+                Err(error) => return Err(error.into()),
+            };
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "notes.update",
+                    false,
+                    "PUT",
+                    "/index.php/apps/notes/api/v1/notes/{note-id}",
+                    target([
+                        ("note_id", json!(updated.id.clone())),
+                        ("title", json!(updated.title.clone())),
+                        ("content_present", json!(updated.content.is_some())),
+                    ]),
+                ),
+            );
+            json_value(NotesUpdateOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                dry_run: false,
+                updated: true,
+                note: NoteWriteSummary::from_note(&updated),
+            })
+        }
         NotesCommand::Delete(args) => {
             if args.dry_run {
                 record(
@@ -1688,6 +1754,20 @@ fn build_note_create_options(
         title: args.title.clone(),
         content,
         category: args.category.clone(),
+    })
+}
+
+fn build_note_update_options(
+    args: &commands::NotesUpdateArgs,
+) -> CliResult<nextcloud::NotesUpdateOptions> {
+    let content = resolve_note_content(args.content.clone(), args.from_file.as_deref())?;
+    if args.title.is_none() && content.is_none() {
+        return Err(CliError::NoNoteUpdateFields);
+    }
+    Ok(nextcloud::NotesUpdateOptions {
+        id: args.note_id.clone(),
+        title: args.title.clone(),
+        content,
     })
 }
 
@@ -2194,12 +2274,22 @@ struct NotesCreateOutput {
 }
 
 #[derive(Debug, Serialize)]
+struct NotesUpdateOutput {
+    profile: String,
+    server: String,
+    dry_run: bool,
+    updated: bool,
+    note: NoteWriteSummary,
+}
+
+#[derive(Debug, Serialize)]
 struct NoteWriteSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     etag: Option<String>,
-    title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     category: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2214,8 +2304,20 @@ impl NoteWriteSummary {
         Self {
             id: None,
             etag: None,
-            title: options.title.clone(),
+            title: Some(options.title.clone()),
             category: options.category.clone(),
+            modified_at: None,
+            content_present: options.content.is_some(),
+            content_bytes: options.content.as_ref().map(|content| content.len()),
+        }
+    }
+
+    fn from_update_options(options: &nextcloud::NotesUpdateOptions) -> Self {
+        Self {
+            id: Some(options.id.clone()),
+            etag: None,
+            title: options.title.clone(),
+            category: None,
             modified_at: None,
             content_present: options.content.is_some(),
             content_bytes: options.content.as_ref().map(|content| content.len()),
@@ -2226,7 +2328,7 @@ impl NoteWriteSummary {
         Self {
             id: Some(note.id.clone()),
             etag: note.etag.clone(),
-            title: note.title.clone().unwrap_or_default(),
+            title: note.title.clone(),
             category: note.category.clone(),
             modified_at: note.modified_at.clone(),
             content_present: note.content.is_some(),

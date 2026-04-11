@@ -1254,6 +1254,71 @@ fn notes_delete_requires_confirmation_and_supports_dry_run()
 }
 
 #[test]
+fn notes_update_dry_run_requires_fields_and_hides_content() -> Result<(), Box<dyn std::error::Error>>
+{
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "notes",
+            "update",
+            "123",
+            "--dry-run",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("no_note_update_fields"));
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "notes",
+            "update",
+            "123",
+            "--title",
+            "Updated",
+            "--content",
+            "private update body",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"updated\": false"))
+        .stdout(predicate::str::contains("private update body").not());
+
+    Ok(())
+}
+
+#[test]
 fn deck_boards_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
     Command::cargo_bin("nextcloud-cli")?
         .args(["deck", "boards", "--help"])

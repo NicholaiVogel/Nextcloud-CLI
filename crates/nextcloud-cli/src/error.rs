@@ -82,6 +82,9 @@ pub enum CliError {
     #[error("pass only one note content source: --content or --from-file")]
     ConflictingNoteContentSources,
 
+    #[error("note update requires at least one field: --title, --content, or --from-file")]
+    NoNoteUpdateFields,
+
     #[error("Nextcloud app `{app}` is unavailable for source `{api_source}`")]
     AppUnavailable { app: String, api_source: String },
 
@@ -165,6 +168,7 @@ impl CliError {
             Self::InvalidLimit { .. } => "invalid_limit",
             Self::InvalidCalendarEventRange => "invalid_calendar_event_range",
             Self::ConflictingNoteContentSources => "conflicting_note_content_sources",
+            Self::NoNoteUpdateFields => "no_note_update_fields",
             Self::AppUnavailable { .. } => "app_unavailable",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
@@ -205,6 +209,7 @@ impl CliError {
             Self::InvalidLimit { .. } => 2,
             Self::InvalidCalendarEventRange => 2,
             Self::ConflictingNoteContentSources => 2,
+            Self::NoNoteUpdateFields => 2,
             Self::AppUnavailable { .. } => 6,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::OcsStatus { .. }) => 6,

@@ -1947,6 +1947,8 @@ Behavior:
 - Support optimistic conflict detection when the API exposes ETag or modified
   metadata.
 - Support `--dry-run`.
+- Status: `notes update <note-id>` is implemented for title/content updates,
+  `--from-file`, and `--dry-run`. ETag conflict flags remain planned.
 
 Completion gate:
 
@@ -5335,8 +5337,8 @@ nextcloud-cli calendar create --calendar personal --summary Test --starts-at 202
 
 Deliverables:
 
-- Notes read/write commands: `notes list`, `notes create`, and `notes delete`
-  implemented
+- Notes read/write commands: `notes list`, `notes create`, `notes update`, and
+  `notes delete` implemented
 - Deck board, stack, and card commands: `deck boards` and `deck cards`
   implemented for read-only board/card listing
 - Activity feed command: implemented for `activity recent --limit <n>`
@@ -5348,6 +5350,7 @@ Completion signal:
 ```bash
 nextcloud-cli notes list --exclude-content --format json
 nextcloud-cli notes create --title "Smoke" --content "test" --dry-run --format json
+nextcloud-cli notes update 1 --title "Smoke" --dry-run --format json
 nextcloud-cli notes delete 1 --dry-run --format json
 nextcloud-cli deck boards --format json
 nextcloud-cli deck cards --board 1 --format json

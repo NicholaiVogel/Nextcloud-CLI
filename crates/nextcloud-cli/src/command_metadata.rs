@@ -188,6 +188,11 @@ pub fn command_schema() -> CommandSchema {
                 "NotesCreateResult",
             ),
             stable(
+                "notes update",
+                "Update note title or content through the Nextcloud Notes API, with dry-run support.",
+                "NotesUpdateResult",
+            ),
+            stable(
                 "notes delete",
                 "Delete a note through the Nextcloud Notes API with dry-run and confirmation.",
                 "NotesDeleteResult",
