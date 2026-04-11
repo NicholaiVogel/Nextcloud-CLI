@@ -113,6 +113,11 @@ pub fn command_schema() -> CommandSchema {
                 "SharesListResult",
             ),
             stable(
+                "shares create",
+                "Create a public link share through the Nextcloud OCS files sharing API.",
+                "SharesCreateResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

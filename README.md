@@ -65,6 +65,7 @@ Implemented today:
 - server status and capabilities
 - WebDAV file list, name search, stat, mkdir, upload, streaming download, and delete
 - OCS share listing
+- public link share dry-runs and guarded creation
 - machine-readable command metadata with `commands schema`
 
 The canonical product contract lives in [`docs/SPEC.md`](docs/SPEC.md).
@@ -192,7 +193,7 @@ Current commands:
 | Profiles | `profiles list`, `profiles show <name>`, `profiles set-default <name>` |
 | Server | `server status`, `server capabilities [--refresh]` |
 | Files | `files list`, `files search`, `files stat`, `files mkdir`, `files upload`, `files download`, `files delete` |
-| Shares | `shares list` |
+| Shares | `shares list`, `shares create --public` |
 | Updates | `update check` |
 
 See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the implemented command list and
@@ -322,6 +323,18 @@ nxc --profile personal shares list --shared-with-me
 `shares list` normalizes Nextcloud's OCS response into common share objects and
 does not create, modify, or revoke shares.
 
+### Preview public link creation
+
+Public link creation is sensitive. Previewing does not make a network request:
+
+```bash
+nxc --profile personal shares create /Documents/report.pdf --public --dry-run
+```
+
+Actual public link creation requires both `--yes` and a profile policy that
+allows public shares. New profiles default to `allow_public_shares = false`
+until policy commands land.
+
 ## Environment variables
 
 Implemented environment variables:
@@ -437,7 +450,8 @@ Current Phase 3 work is sharing and safety policy:
 
 - OCS client and envelope parser, implemented
 - `shares list`, implemented
-- public link creation with dry-run support
+- public link creation with dry-run support and guarded actual execution,
+  implemented
 - share revoke/delete with confirmation
 - per-profile policy enforcement
 - audit event shape for writes

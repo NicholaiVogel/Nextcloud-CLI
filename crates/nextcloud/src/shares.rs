@@ -29,6 +29,31 @@ impl SharesClient {
             .into_data()?;
         Ok(raw.into_iter().map(Share::from).collect())
     }
+
+    pub async fn create_public(&self, options: &ShareCreatePublicOptions) -> Result<Share> {
+        let path = normalize_remote_path(&options.path)?;
+        let mut form = vec![
+            ("path".to_owned(), path),
+            ("shareType".to_owned(), "3".to_owned()),
+            ("permissions".to_owned(), options.permissions.to_string()),
+        ];
+        if let Some(password) = &options.password {
+            form.push(("password".to_owned(), password.clone()));
+        }
+        if let Some(expire_date) = &options.expire_date {
+            form.push(("expireDate".to_owned(), expire_date.clone()));
+        }
+
+        let raw: RawShare = self
+            .client
+            .post_ocs_form_json::<_, OcsEnvelope<RawShare>>(
+                &format!("{SHARES_ENDPOINT}?format=json"),
+                &form,
+            )
+            .await?
+            .into_data()?;
+        Ok(Share::from(raw))
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -36,6 +61,14 @@ pub struct ShareListOptions {
     pub path: Option<String>,
     pub shared_with_me: bool,
     pub include_tags: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShareCreatePublicOptions {
+    pub path: String,
+    pub password: Option<String>,
+    pub expire_date: Option<String>,
+    pub permissions: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -293,6 +326,63 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn create_public_sends_ocs_form_and_normalizes_response() -> Result<()> {
+        let server = OneShotServer::spawn(
+            r#"{
+                "ocs": {
+                    "meta": {
+                        "status": "ok",
+                        "statuscode": 200,
+                        "message": "OK"
+                    },
+                    "data": {
+                        "id": "123",
+                        "path": "/Documents/report.pdf",
+                        "share_type": 3,
+                        "url": "https://cloud.example.com/s/abc123",
+                        "token": "abc123",
+                        "permissions": 1,
+                        "password": "secret",
+                        "expiration": "2026-05-01",
+                        "stime": 1775833445
+                    }
+                }
+            }"#,
+        );
+
+        let share = mock_shares(server.base_url())?
+            .create_public(&ShareCreatePublicOptions {
+                path: "/Documents/report.pdf".to_owned(),
+                password: Some("super-secret".to_owned()),
+                expire_date: Some("2026-05-01".to_owned()),
+                permissions: 1,
+            })
+            .await?;
+        let request = server.join();
+
+        assert_eq!(request.method, "POST");
+        assert_eq!(
+            request.path,
+            "/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json"
+        );
+        assert_eq!(request.header("ocs-apirequest"), Some("true"));
+        assert_eq!(
+            request.header("content-type"),
+            Some("application/x-www-form-urlencoded")
+        );
+        assert!(request.header("authorization").is_some());
+        assert!(request.body.contains("path=%2FDocuments%2Freport.pdf"));
+        assert!(request.body.contains("shareType=3"));
+        assert!(request.body.contains("permissions=1"));
+        assert!(request.body.contains("password=super-secret"));
+        assert!(request.body.contains("expireDate=2026-05-01"));
+        assert_eq!(share.share_type, "public_link");
+        assert!(share.password_protected);
+        assert_eq!(share.expiration.as_deref(), Some("2026-05-01"));
+        Ok(())
+    }
+
     fn mock_shares(base_url: &str) -> Result<SharesClient> {
         let base = Url::parse(base_url).expect("valid mock URL");
         let client = NextcloudClient::new(
@@ -310,6 +400,7 @@ mod tests {
         method: String,
         path: String,
         headers: HashMap<String, String>,
+        body: String,
     }
 
     impl RecordedRequest {
@@ -356,9 +447,33 @@ mod tests {
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("set read timeout");
 
-        let mut buffer = [0_u8; 8192];
-        let read = stream.read(&mut buffer).expect("read request");
-        let request = String::from_utf8_lossy(&buffer[..read]);
+        let mut buffer = Vec::new();
+        let mut header_end = None;
+        let mut content_length = 0_usize;
+
+        loop {
+            let mut chunk = [0_u8; 1024];
+            let read = stream.read(&mut chunk).expect("read request");
+            assert!(read != 0, "connection closed before request completed");
+            buffer.extend_from_slice(&chunk[..read]);
+
+            if header_end.is_none()
+                && let Some(position) = find_header_end(&buffer)
+            {
+                header_end = Some(position);
+                let headers = String::from_utf8_lossy(&buffer[..position]);
+                content_length = parse_content_length(&headers);
+            }
+
+            if let Some(position) = header_end
+                && buffer.len() >= position + 4 + content_length
+            {
+                break;
+            }
+        }
+
+        let header_end = header_end.expect("request headers");
+        let request = String::from_utf8_lossy(&buffer[..header_end]);
         let mut lines = request.lines();
         let request_line = lines.next().expect("request line");
         let mut request_parts = request_line.split_whitespace();
@@ -374,10 +489,15 @@ mod tests {
             }
         }
 
+        let body_start = header_end + 4;
+        let body_end = body_start + content_length;
+        let body = String::from_utf8_lossy(&buffer[body_start..body_end]).into_owned();
+
         RecordedRequest {
             method,
             path,
             headers,
+            body,
         }
     }
 
@@ -390,5 +510,18 @@ mod tests {
         stream
             .write_all(response.as_bytes())
             .expect("write response");
+    }
+
+    fn find_header_end(buffer: &[u8]) -> Option<usize> {
+        buffer.windows(4).position(|window| window == b"\r\n\r\n")
+    }
+
+    fn parse_content_length(headers: &str) -> usize {
+        headers
+            .lines()
+            .filter_map(|line| line.split_once(':'))
+            .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+            .and_then(|(_, value)| value.trim().parse().ok())
+            .unwrap_or(0)
     }
 }

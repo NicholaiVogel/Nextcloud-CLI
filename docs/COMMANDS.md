@@ -30,4 +30,5 @@ detection, core WebDAV file-transfer commands, and initial OCS share listing:
 - `files download <remote> <local> [--overwrite]`
 - `files delete <path> [--dry-run] --yes`
 - `shares list [--path <path>] [--shared-with-me] [--include-tags]`
+- `shares create <path> --public [--password <password>] [--expire-date <yyyy-mm-dd>] [--dry-run] [--yes]`
 - `update check`

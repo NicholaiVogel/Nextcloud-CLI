@@ -1441,7 +1441,7 @@ Completion gate:
 Syntax:
 
 ```bash
-nextcloud-cli shares create <path> --public [--password <password>] [--expire-date <yyyy-mm-dd>]
+nextcloud-cli shares create <path> --public [--password <password>] [--expire-date <yyyy-mm-dd>] [--dry-run] [--yes]
 ```
 
 Backing API:
@@ -1453,6 +1453,9 @@ Behavior:
 - Public link share maps to Nextcloud share type `3`.
 - Default permissions should be read-only unless explicitly expanded later.
 - If password is provided, never echo it.
+- `--dry-run` must not send a network request.
+- Actual creation requires `--yes`.
+- Actual creation requires the selected profile policy to allow public shares.
 - Return normalized share object.
 
 Expected output:
@@ -1475,7 +1478,10 @@ Expected output:
 Completion gate:
 
 - Tests cover public share creation, password redaction, expiration, missing path,
-  forbidden path, OCS validation errors, and malformed OCS response.
+  forbidden path, OCS validation errors, and malformed OCS response. Current
+  implementation covers public share request construction, password redaction in
+  CLI dry-run output, expiration validation, confirmation requirement, profile
+  policy denial before network access, and normalized public link output.
 - Real-server smoke test creates and deletes or records cleanup of a fixture share.
 
 ### 11.4 `shares delete` / `shares revoke`
@@ -5240,7 +5246,7 @@ Deliverables:
   status mapping
 - `shares list`: implemented with `--path`, `--shared-with-me`, and
   `--include-tags`
-- `shares create --public`
+- `shares create --public`: implemented for dry-run and guarded actual execution
 - `shares delete` / `shares revoke`
 - destructive action confirmation model
 - first version of per-profile policy enforcement

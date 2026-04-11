@@ -36,6 +36,24 @@ pub enum CliError {
     )]
     ConfirmationRequired,
 
+    #[error(
+        "sensitive command `{command}` requires confirmation; pass --yes to continue or --dry-run to preview"
+    )]
+    SensitiveConfirmationRequired { command: String },
+
+    #[error("profile `{profile}` does not allow `{command}`: {policy}")]
+    PolicyDenied {
+        profile: String,
+        command: String,
+        policy: String,
+    },
+
+    #[error("unsupported share creation mode; currently supported: --public")]
+    UnsupportedShareCreateMode,
+
+    #[error("invalid expire date `{value}`; expected YYYY-MM-DD")]
+    InvalidExpireDate { value: String },
+
     #[error("failed to read credentials from {path}: {source}")]
     CredentialRead {
         path: PathBuf,
@@ -104,6 +122,10 @@ impl CliError {
             Self::RemotePathExists { .. } => "remote_path_exists",
             Self::UnsupportedSearchMode { .. } => "unsupported_search_mode",
             Self::ConfirmationRequired => "confirmation_required",
+            Self::SensitiveConfirmationRequired { .. } => "confirmation_required",
+            Self::PolicyDenied { .. } => "policy_denied",
+            Self::UnsupportedShareCreateMode => "unsupported_share_create_mode",
+            Self::InvalidExpireDate { .. } => "invalid_expire_date",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
             Self::CredentialParse { .. } => "credential_parse_failed",
@@ -131,6 +153,10 @@ impl CliError {
             Self::RemotePathExists { .. } => 2,
             Self::UnsupportedSearchMode { .. } => 2,
             Self::ConfirmationRequired => 2,
+            Self::SensitiveConfirmationRequired { .. } => 2,
+            Self::PolicyDenied { .. } => 2,
+            Self::UnsupportedShareCreateMode => 2,
+            Self::InvalidExpireDate { .. } => 2,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::OcsStatus { .. }) => 6,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,

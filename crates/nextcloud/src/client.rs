@@ -117,6 +117,25 @@ impl NextcloudClient {
         parse_json_response(response).await
     }
 
+    pub async fn post_ocs_form_json<F, T>(&self, path: &str, form: &F) -> Result<T>
+    where
+        F: Serialize + ?Sized,
+        T: DeserializeOwned,
+    {
+        let url = self.join(path)?;
+        let mut request = self
+            .http
+            .post(url)
+            .header("OCS-APIRequest", "true")
+            .form(form);
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+
+        let response = request.send().await?;
+        parse_json_response(response).await
+    }
+
     pub async fn request_text(
         &self,
         method: Method,

@@ -24,5 +24,5 @@ pub use config_schema::{
 };
 pub use error::{Error, Result};
 pub use ocs::{OcsEnvelope, OcsMeta};
-pub use shares::{Share, ShareListOptions, SharesClient};
+pub use shares::{Share, ShareCreatePublicOptions, ShareListOptions, SharesClient};
 pub use webdav::{WebDavClient, WebDavEntry};

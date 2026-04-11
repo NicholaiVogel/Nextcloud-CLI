@@ -5,6 +5,7 @@ mod credential_store;
 mod error;
 mod output;
 
+use chrono::NaiveDate;
 use chrono::Utc;
 use clap::Parser;
 use std::fs;
@@ -406,7 +407,77 @@ async fn handle_shares(
                 "count": count,
             }))
         }
+        SharesCommand::Create(args) => {
+            if !args.public {
+                return Err(CliError::UnsupportedShareCreateMode);
+            }
+
+            let path = nextcloud::webdav::normalize_remote_path(&args.path)?;
+            let expire_date = args
+                .expire_date
+                .as_deref()
+                .map(validate_expire_date)
+                .transpose()?;
+            let password_protected = args.password.is_some();
+
+            if args.dry_run {
+                return json_value(json!({
+                    "profile": profile.name,
+                    "server": profile.server.to_string(),
+                    "path": path,
+                    "dry_run": true,
+                    "created": false,
+                    "public": true,
+                    "share_type": "public_link",
+                    "permissions": 1,
+                    "password_protected": password_protected,
+                    "expiration": expire_date,
+                    "policy_allowed": profile.policy.allow_public_shares,
+                    "requires_confirmation": true,
+                }));
+            }
+
+            if !args.yes {
+                return Err(CliError::SensitiveConfirmationRequired {
+                    command: "shares create --public".to_owned(),
+                });
+            }
+
+            if !profile.policy.allow_public_shares {
+                return Err(CliError::PolicyDenied {
+                    profile: profile.name,
+                    command: "shares create --public".to_owned(),
+                    policy: "allow_public_shares=false".to_owned(),
+                });
+            }
+
+            let share = shares_client
+                .create_public(&nextcloud::ShareCreatePublicOptions {
+                    path: path.clone(),
+                    password: args.password,
+                    expire_date: expire_date.clone(),
+                    permissions: 1,
+                })
+                .await?;
+
+            json_value(json!({
+                "profile": profile.name,
+                "server": profile.server.to_string(),
+                "path": path,
+                "dry_run": false,
+                "created": true,
+                "share": share,
+            }))
+        }
     }
+}
+
+fn validate_expire_date(value: &str) -> CliResult<String> {
+    NaiveDate::parse_from_str(value, "%Y-%m-%d")
+        .map(|_| value.to_owned())
+        .map_err(|_| CliError::InvalidExpireDate {
+            value: value.to_owned(),
+        })
 }
 
 async fn handle_files(
