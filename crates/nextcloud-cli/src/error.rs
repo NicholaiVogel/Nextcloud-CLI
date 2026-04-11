@@ -28,6 +28,9 @@ pub enum CliError {
     #[error("remote path {path} already exists; pass --overwrite to replace it")]
     RemotePathExists { path: String },
 
+    #[error("unsupported search mode `{mode}`; supported mode: name")]
+    UnsupportedSearchMode { mode: String },
+
     #[error(
         "destructive command requires confirmation; pass --yes to continue or --dry-run to preview"
     )]
@@ -99,6 +102,7 @@ impl CliError {
             Self::LocalFileExists { .. } => "local_file_exists",
             Self::LocalUploadNotFile { .. } => "local_upload_not_file",
             Self::RemotePathExists { .. } => "remote_path_exists",
+            Self::UnsupportedSearchMode { .. } => "unsupported_search_mode",
             Self::ConfirmationRequired => "confirmation_required",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
@@ -125,6 +129,7 @@ impl CliError {
             Self::LocalFileExists { .. } => 2,
             Self::LocalUploadNotFile { .. } => 2,
             Self::RemotePathExists { .. } => 2,
+            Self::UnsupportedSearchMode { .. } => 2,
             Self::ConfirmationRequired => 2,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,

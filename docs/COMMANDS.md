@@ -23,6 +23,7 @@ auth/profile/server detection slice, and the core WebDAV file-transfer commands:
 - `server status`
 - `server capabilities [--refresh]`
 - `files list [path]`
+- `files search <query> [--path <scope>] [--limit <n>] [--search-mode name]`
 - `files stat <path>`
 - `files mkdir <path> [--parents] [--dry-run]`
 - `files upload <local> <remote> [--overwrite] [--content-type <mime>]`

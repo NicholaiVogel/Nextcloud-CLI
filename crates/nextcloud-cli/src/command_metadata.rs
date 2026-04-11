@@ -78,6 +78,11 @@ pub fn command_schema() -> CommandSchema {
                 "FilesList",
             ),
             stable(
+                "files search",
+                "Search remote Nextcloud file names through WebDAV SEARCH.",
+                "FilesSearchResult",
+            ),
+            stable(
                 "files stat",
                 "Fetch metadata for one remote Nextcloud path through WebDAV.",
                 "WebDavEntry",

@@ -46,6 +46,7 @@ printf 'nextcloud-cli smoke %s\n' "$STAMP" > "$LOCAL_SRC"
 cargo run -p nextcloud-cli -- --profile personal files mkdir "$REMOTE_DIR" --parents
 cargo run -p nextcloud-cli -- --profile personal files upload "$LOCAL_SRC" "$REMOTE_FILE" --content-type text/plain
 cargo run -p nextcloud-cli -- --profile personal files stat "$REMOTE_FILE"
+cargo run -p nextcloud-cli -- --profile personal files search "hello file" --path "$REMOTE_DIR" --limit 10
 cargo run -p nextcloud-cli -- --profile personal files download "$REMOTE_FILE" "$LOCAL_DST"
 cmp "$LOCAL_SRC" "$LOCAL_DST"
 cargo run -p nextcloud-cli -- --profile personal files delete "$REMOTE_DIR" --dry-run

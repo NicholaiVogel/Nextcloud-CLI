@@ -384,6 +384,24 @@ async fn handle_files(
                 "count": count,
             }))
         }
+        FilesCommand::Search(args) => {
+            if args.search_mode != "name" {
+                return Err(CliError::UnsupportedSearchMode {
+                    mode: args.search_mode,
+                });
+            }
+            let scope = nextcloud::webdav::normalize_remote_path(&args.path)?;
+            let files = webdav.search(&args.query, &scope, args.limit).await?;
+            let count = files.len();
+            json_value(json!({
+                "query": args.query,
+                "scope": scope,
+                "search_mode": "name",
+                "limit": args.limit.clamp(1, 100),
+                "files": files,
+                "count": count,
+            }))
+        }
         FilesCommand::Stat(args) => {
             let path = nextcloud::webdav::normalize_remote_path(&args.path)?;
             let entry = webdav.stat(&path).await?;

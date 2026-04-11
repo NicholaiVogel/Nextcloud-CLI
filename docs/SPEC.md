@@ -38,7 +38,7 @@ The repository now has a working Rust workspace and an initial executable CLI.
 The current implementation covers the repository spine, Login Flow v2, fully
 headless app-password auth, manual app-password auth, profile/config plumbing,
 server status/capability calls with a per-profile cache, and the core WebDAV
-file-transfer commands. The GitHub repository exists at
+file-transfer and name-search commands. The GitHub repository exists at
 <https://github.com/NicholaiVogel/Nextcloud-CLI> and `main` tracks
 `origin/main`.
 
@@ -65,7 +65,7 @@ Completed so far:
 - Multistatus XML parser with unit coverage.
 - Remote path normalization and segment encoding with unit coverage.
 - `files list`, `files stat`, `files mkdir --parents`, `files upload`,
-  `files download`, and `files delete --yes`.
+  `files download`, `files search`, and `files delete --yes`.
 - Command metadata through `commands schema`.
 - README plus `docs/COMMANDS.md`, `docs/CONFIG.md`, `docs/INSTALL.md`,
   `docs/NETWORK.md`, `docs/SMOKE.md`, and `docs/COMPATIBILITY.md`.
@@ -91,6 +91,8 @@ Real-server smoke against `https://nextcloud.biohazardvfx.com`:
   `files delete --dry-run` succeeded.
 - `files delete --yes` removed the smoke fixture folder, and a follow-up stat
   confirmed it was gone.
+- `files search` found an uploaded fixture by display name inside a scoped
+  smoke folder, then the folder was deleted.
 - Downloaded fixture bytes matched the uploaded fixture.
 - Capability smoke reported 20 top-level capability groups.
 
@@ -98,7 +100,7 @@ Important pending items before MVP:
 
 - OS keyring backend validation on target desktop/server platforms.
 - Mock HTTP tests for WebDAV and OCS commands.
-- DAV name search.
+- Large-file streaming and resumable transfers.
 - Shares, calendar, contacts, notes, Deck, activity, raw DAV/OCS commands.
 - Full profile policy commands and enforcement.
 - Distribution work: release artifacts, npm wrapper, curl installer, and real
@@ -684,6 +686,7 @@ nextcloud-cli profiles set-default <name>
 nextcloud-cli server status
 nextcloud-cli server capabilities [--refresh]
 nextcloud-cli files list [path]
+nextcloud-cli files search <query> [--path <scope>] [--limit <n>] [--search-mode name]
 nextcloud-cli files stat <path>
 nextcloud-cli files mkdir <path> [--parents] [--dry-run]
 nextcloud-cli files upload <local> <remote> [--overwrite] [--content-type <mime>]
@@ -712,6 +715,8 @@ Implementation notes:
   `--overwrite` is passed.
 - `files download` refuses to overwrite an existing local file unless
   `--overwrite` is passed.
+- `files search` currently supports name search through DAV `SEARCH`; richer
+  content/local-index search remains pending.
 - `files delete` requires `--yes` unless `--dry-run` is passed. Root deletion is
   rejected.
 - `update check` currently reports development placeholder metadata. Release
@@ -1158,6 +1163,7 @@ Behavior:
 - Default scope is `/`.
 - Default limit is `25`.
 - Search should match display names first.
+- The initial implementation supports `--search-mode name` only.
 - Results use the common file object shape.
 
 Expected output:
@@ -1173,9 +1179,9 @@ Expected output:
 
 Completion gate:
 
-- Tests cover XML request generation, normal results, empty results, invalid scope,
-  and unsupported server behavior.
-- Real-server smoke test finds an uploaded fixture file.
+- Tests cover XML request generation, search href parsing, invalid scope, and
+  unsupported search modes.
+- Real-server smoke test finds an uploaded fixture file by name.
 
 ### 10.4 `files stat`
 
@@ -5186,9 +5192,9 @@ nextcloud-cli server capabilities --format json
 ### 41.3 Phase 2: WebDAV files core
 
 Status: partial. The WebDAV client, multistatus parser, path normalization,
-`files list`, `files stat`, `files mkdir --parents`, `files upload`,
-`files download`, and `files delete` are implemented. DAV search, streaming
-large-download handling, and mock HTTP tests remain pending.
+`files list`, `files search`, `files stat`, `files mkdir --parents`,
+`files upload`, `files download`, and `files delete` are implemented.
+Streaming large-download handling and mock HTTP tests remain pending.
 
 Deliverables:
 
@@ -5196,12 +5202,13 @@ Deliverables:
 - WebDAV client: partial, PROPFIND, MKCOL, PUT, GET, and DELETE implemented
 - multistatus parser: implemented with unit coverage
 - `files list`: implemented
+- `files search`: implemented for display-name search through DAV `SEARCH`
 - `files stat`: implemented
 - `files mkdir`: implemented with `--dry-run`, MKCOL, and `--parents`
 - `files upload` simple PUT path: implemented
 - `files download` buffered path: implemented; streaming large-download path pending
 - `files delete`: implemented with `--dry-run`, `--yes`, and root-path rejection
-- DAV name search: pending
+- richer content/local-index search: pending
 
 Completion signal:
 

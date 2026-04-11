@@ -164,6 +164,7 @@ pub struct ServerCapabilitiesArgs {
 #[derive(Debug, Subcommand)]
 pub enum FilesCommand {
     List(FilesPathArgs),
+    Search(FilesSearchArgs),
     Stat(FilesPathArgs),
     Mkdir(FilesMkdirArgs),
     Upload(FilesUploadArgs),
@@ -175,6 +176,20 @@ pub enum FilesCommand {
 pub struct FilesPathArgs {
     #[arg(default_value = "/")]
     pub path: String,
+}
+
+#[derive(Debug, Args)]
+pub struct FilesSearchArgs {
+    pub query: String,
+
+    #[arg(long, default_value = "/")]
+    pub path: String,
+
+    #[arg(long, default_value_t = 25)]
+    pub limit: u32,
+
+    #[arg(long, default_value = "name")]
+    pub search_mode: String,
 }
 
 #[derive(Debug, Args)]

@@ -1,3 +1,4 @@
+use percent_encoding::{AsciiSet, CONTROLS};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use reqwest::{Method, StatusCode};
@@ -31,6 +32,20 @@ impl WebDavClient {
         Ok(parse_multistatus(&text)?
             .into_iter()
             .find(|entry| entry.path == base))
+    }
+
+    pub async fn search(&self, query: &str, scope: &str, limit: u32) -> Result<Vec<WebDavEntry>> {
+        let scope = normalize_remote_path(scope)?;
+        let body = build_search_request(&self.username, query, &scope, limit)?;
+        let text = self
+            .client
+            .request_xml_text(
+                Method::from_bytes(b"SEARCH").expect("valid method"),
+                "remote.php/dav",
+                body,
+            )
+            .await?;
+        parse_multistatus(&text)
     }
 
     pub async fn mkdir(&self, path: &str) -> Result<()> {
@@ -292,8 +307,13 @@ fn finish_entry(entry: EntryBuilder) -> Option<WebDavEntry> {
 }
 
 fn href_to_remote_path(href: &str) -> Option<String> {
-    let marker = "/remote.php/dav/files/";
-    let after_marker = href.split(marker).nth(1)?;
+    let after_marker = if let Some((_, after_marker)) = href.split_once("/remote.php/dav/files/") {
+        after_marker
+    } else if let Some((_, after_marker)) = href.split_once("/files/") {
+        after_marker
+    } else {
+        return None;
+    };
     let mut parts = after_marker.split('/');
     parts.next()?;
     let rest = parts.collect::<Vec<_>>().join("/");
@@ -361,14 +381,108 @@ pub fn reject_root_path(path: &str) -> Result<()> {
     Ok(())
 }
 
-fn encode_segment(segment: &str) -> String {
-    percent_encoding::utf8_percent_encode(segment, percent_encoding::NON_ALPHANUMERIC).to_string()
+pub fn build_search_request(
+    username: &str,
+    query: &str,
+    scope: &str,
+    limit: u32,
+) -> Result<String> {
+    let normalized_scope = normalize_remote_path(scope)?;
+    let limit = limit.clamp(1, 100);
+    let encoded_user = encode_segment(username);
+    let encoded_scope = encode_remote_path(&normalized_scope)?;
+    let href = if encoded_scope == "/" {
+        format!("/files/{encoded_user}/")
+    } else {
+        format!("/files/{encoded_user}{encoded_scope}")
+    };
+    let pattern = format!("%{}%", escape_like_literal(query));
+
+    Ok(format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<d:searchrequest xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" xmlns:ns="https://github.com/icewind1991/SearchDAV/ns">
+  <d:basicsearch>
+    <d:select>
+      <d:prop>
+        <d:getlastmodified />
+        <d:getcontentlength />
+        <d:getcontenttype />
+        <d:resourcetype />
+        <d:getetag />
+        <oc:fileid />
+        <oc:permissions />
+      </d:prop>
+    </d:select>
+    <d:from>
+      <d:scope>
+        <d:href>{}</d:href>
+        <d:depth>infinity</d:depth>
+      </d:scope>
+    </d:from>
+    <d:where>
+      <d:like>
+        <d:prop>
+          <d:displayname />
+        </d:prop>
+        <d:literal>{}</d:literal>
+      </d:like>
+    </d:where>
+    <d:orderby>
+      <d:order>
+        <d:prop>
+          <d:displayname />
+        </d:prop>
+        <d:ascending />
+      </d:order>
+    </d:orderby>
+    <d:limit>
+      <d:nresults>{}</d:nresults>
+      <ns:firstresult>0</ns:firstresult>
+    </d:limit>
+  </d:basicsearch>
+</d:searchrequest>"#,
+        escape_xml_text(&href),
+        escape_xml_text(&pattern),
+        limit,
+    ))
 }
+
+fn escape_like_literal(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+fn encode_segment(segment: &str) -> String {
+    percent_encoding::utf8_percent_encode(segment, PATH_SEGMENT_ENCODE_SET).to_string()
+}
+
+const PATH_SEGMENT_ENCODE_SET: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'%')
+    .add(b'<')
+    .add(b'>')
+    .add(b'?')
+    .add(b'`')
+    .add(b'{')
+    .add(b'}');
 
 fn percent_decode_path(path: &str) -> String {
     percent_encoding::percent_decode_str(path)
         .decode_utf8_lossy()
         .into_owned()
+}
+
+fn escape_xml_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 fn local_name(name: &[u8]) -> &str {
@@ -424,7 +538,7 @@ mod tests {
     fn encodes_remote_path_by_segment() -> Result<()> {
         assert_eq!(
             encode_remote_path("/Documents/a report #1.md")?,
-            "/Documents/a%20report%20%231%2Emd"
+            "/Documents/a%20report%20%231.md"
         );
         Ok(())
     }
@@ -445,6 +559,36 @@ mod tests {
         assert_eq!(entries[0].path, "/Documents");
         assert_eq!(entries[0].name, "Documents");
         assert!(entries[0].is_dir);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_search_hrefs_from_dav_arbiter() -> Result<()> {
+        let xml = r#"<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+  <d:response>
+    <d:href>/files/nicholai/Documents/report%20Q1.md</d:href>
+    <d:propstat><d:prop>
+      <d:getcontentlength>42</d:getcontentlength>
+      <d:getcontenttype>text/markdown</d:getcontenttype>
+    </d:prop></d:propstat>
+  </d:response>
+</d:multistatus>"#;
+
+        let entries = parse_multistatus(xml)?;
+        assert_eq!(entries[0].path, "/Documents/report Q1.md");
+        assert_eq!(entries[0].name, "report Q1.md");
+        Ok(())
+    }
+
+    #[test]
+    fn builds_display_name_search_request() -> Result<()> {
+        let body = build_search_request("Nicholai Vogel", "hello #1", "/", 25)?;
+        assert!(body.contains("<d:href>/files/Nicholai%20Vogel/</d:href>"));
+        assert!(body.contains("<d:like>"));
+        assert!(body.contains("<d:displayname />"));
+        assert!(body.contains("<d:literal>%hello #1%</d:literal>"));
+        assert!(body.contains("<d:nresults>25</d:nresults>"));
         Ok(())
     }
 }

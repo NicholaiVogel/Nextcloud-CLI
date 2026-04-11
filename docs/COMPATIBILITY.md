@@ -8,7 +8,7 @@ storing only the generated app password.
 
 | Server version | Profile | Files | Shares | Calendar | Contacts | Notes | Deck | Activity | Tested at |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 29.0.1 | biohazard | list, mkdir, upload, stat, download, delete | pending | pending | pending | pending | pending | pending | 2026-04-10 |
+| 29.0.1 | biohazard | list, search, mkdir, upload, stat, download, delete | pending | pending | pending | pending | pending | pending | 2026-04-10 |
 
 Notes:
 
@@ -20,5 +20,8 @@ Notes:
   `files delete --dry-run` succeeded.
 - `files delete --yes` removed `/nextcloud-cli-smoke-20260410T233520Z`; a
   follow-up `files stat` returned 404, confirming cleanup.
+- `files search` found an uploaded fixture by display name inside
+  `/nextcloud-cli-search-smoke-20260411T012246Z`; the folder was deleted after
+  the search smoke.
 - Downloaded fixture bytes matched the uploaded fixture.
 - Capability smoke reported 20 top-level capability groups.

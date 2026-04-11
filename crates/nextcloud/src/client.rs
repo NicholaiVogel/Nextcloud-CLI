@@ -138,6 +138,32 @@ impl NextcloudClient {
         Ok(body)
     }
 
+    pub async fn request_xml_text(
+        &self,
+        method: Method,
+        path: &str,
+        body: String,
+    ) -> Result<String> {
+        let url = self.join(path)?;
+        let mut request = self
+            .http
+            .request(method, url)
+            .header(CONTENT_TYPE, "application/xml; charset=utf-8")
+            .body(body);
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+
+        let response = request.send().await?;
+        let status = response.status();
+        let body = response.text().await.unwrap_or_else(|_| String::new());
+        if !status.is_success() {
+            return Err(Error::HttpStatus { status, body });
+        }
+
+        Ok(body)
+    }
+
     pub async fn request_bytes(&self, method: Method, path: &str) -> Result<Vec<u8>> {
         let url = self.join(path)?;
         let mut request = self.http.request(method, url);
