@@ -1,4 +1,4 @@
-# nextcloud-cli
+<h1 align="center">NXC</h1>
 
 Unofficial client-side CLI for Nextcloud, built for humans, shell scripts, and AI
 agents that need structured access to a user's cloud from outside the server.
@@ -7,7 +7,12 @@ agents that need structured access to a user's cloud from outside the server.
 It is designed for local machines, SSH sessions, CI jobs, and agent runtimes
 where predictable output and safe credential handling matter.
 
-Short alias: `nxc`
+> [!NOTE]
+> This is **not** an officially supported Nextcloud product.
+
+> [!IMPORTANT]
+> This project is under active development. Expect breaking changes as we march toward v1.0.
+
 
 ## Status
 
