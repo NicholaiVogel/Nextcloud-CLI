@@ -1,3 +1,4 @@
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -22,6 +23,21 @@ impl DeckClient {
             .get_json::<Vec<RawDeckBoard>>(DECK_BOARDS_ENDPOINT)
             .await?;
         Ok(raw.into_iter().map(DeckBoard::from).collect())
+    }
+
+    pub async fn create_board(&self, options: &DeckBoardCreateOptions) -> Result<DeckBoard> {
+        let raw: RawDeckBoard = self
+            .client
+            .request_json_with_ocs_header(
+                Method::POST,
+                DECK_BOARDS_ENDPOINT,
+                &DeckBoardCreateRequest {
+                    title: options.title.as_str(),
+                    color: options.color.as_str(),
+                },
+            )
+            .await?;
+        Ok(DeckBoard::from(raw))
     }
 
     pub async fn cards(&self, options: &DeckCardsOptions) -> Result<Vec<DeckCard>> {
@@ -56,6 +72,12 @@ pub struct DeckBoard {
     pub color: Option<String>,
     pub archived: bool,
     pub deleted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeckBoardCreateOptions {
+    pub title: String,
+    pub color: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,6 +117,12 @@ struct RawDeckStack {
 struct RawDeckCard {
     #[serde(flatten)]
     fields: Map<String, Value>,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckBoardCreateRequest<'a> {
+    title: &'a str,
+    color: &'a str,
 }
 
 impl From<RawDeckBoard> for DeckBoard {
@@ -291,5 +319,16 @@ mod tests {
         assert_eq!(cards[0].id, "99");
         assert_eq!(cards[0].stack_id, "1");
         assert_eq!(cards[0].stack_title.as_deref(), Some("Doing"));
+    }
+
+    #[test]
+    fn serializes_board_create_request() {
+        let request = DeckBoardCreateRequest {
+            title: "Roadmap",
+            color: "0082c9",
+        };
+        let value = serde_json::to_value(request).expect("serializes");
+        assert_eq!(value["title"], "Roadmap");
+        assert_eq!(value["color"], "0082c9");
     }
 }

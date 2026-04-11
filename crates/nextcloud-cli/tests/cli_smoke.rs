@@ -1324,7 +1324,55 @@ fn deck_boards_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
         .args(["deck", "boards", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("--details"));
+        .stdout(predicate::str::contains("--details"))
+        .stdout(predicate::str::contains("create"));
+
+    Ok(())
+}
+
+#[test]
+fn deck_board_create_dry_run_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "deck",
+            "boards",
+            "create",
+            "--title",
+            "Smoke",
+            "--color",
+            "#0082c9",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"created\": false"))
+        .stdout(predicate::str::contains("\"color\": \"0082c9\""));
 
     Ok(())
 }

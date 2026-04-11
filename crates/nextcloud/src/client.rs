@@ -145,6 +145,30 @@ impl NextcloudClient {
         parse_json_response(response).await
     }
 
+    pub async fn request_json_with_ocs_header<B, T>(
+        &self,
+        method: Method,
+        path: &str,
+        body: &B,
+    ) -> Result<T>
+    where
+        B: Serialize + ?Sized,
+        T: DeserializeOwned,
+    {
+        let url = self.join(path)?;
+        let mut request = self
+            .http
+            .request(method, url)
+            .header("OCS-APIRequest", "true")
+            .json(body);
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+
+        let response = request.send().await?;
+        parse_json_response(response).await
+    }
+
     pub async fn delete_ocs_json<T>(&self, path: &str) -> Result<T>
     where
         T: DeserializeOwned,

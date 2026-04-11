@@ -544,8 +544,28 @@ pub enum DeckCommand {
 
 #[derive(Debug, Args)]
 pub struct DeckBoardsArgs {
+    #[command(subcommand)]
+    pub command: Option<DeckBoardsCommand>,
+
     #[arg(long, default_value_t = false)]
     pub details: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DeckBoardsCommand {
+    Create(DeckBoardCreateArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct DeckBoardCreateArgs {
+    #[arg(long)]
+    pub title: String,
+
+    #[arg(long)]
+    pub color: Option<String>,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]

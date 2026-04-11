@@ -1802,6 +1802,76 @@ async fn handle_deck(
 
     match command {
         DeckCommand::Boards(args) => {
+            if let Some(commands::DeckBoardsCommand::Create(create_args)) = args.command {
+                let board = build_deck_board_create_options(&create_args)?;
+                if create_args.dry_run {
+                    record(
+                        store.paths(),
+                        &command_executed(
+                            &profile.name,
+                            profile.server.as_str(),
+                            "deck.boards.create",
+                            true,
+                            "POST",
+                            "/index.php/apps/deck/api/v1.0/boards",
+                            target([
+                                ("title", json!(board.title.clone())),
+                                ("color", json!(board.color.clone())),
+                            ]),
+                        ),
+                    );
+                    return json_value(DeckBoardCreateOutput {
+                        profile: profile.name,
+                        server: profile.server.to_string(),
+                        dry_run: true,
+                        created: false,
+                        board: DeckBoardCreatePreview {
+                            id: None,
+                            title: board.title,
+                            color: board.color,
+                        },
+                    });
+                }
+
+                let created = match deck.create_board(&board).await {
+                    Ok(board) => board,
+                    Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
+                        return Err(CliError::AppUnavailable {
+                            app: "deck".to_owned(),
+                            api_source: "deck".to_owned(),
+                        });
+                    }
+                    Err(error) => return Err(error.into()),
+                };
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "deck.boards.create",
+                        false,
+                        "POST",
+                        "/index.php/apps/deck/api/v1.0/boards",
+                        target([
+                            ("board_id", json!(created.id.clone())),
+                            ("title", json!(created.title.clone())),
+                            ("color", json!(created.color.clone())),
+                        ]),
+                    ),
+                );
+                return json_value(DeckBoardCreateOutput {
+                    profile: profile.name,
+                    server: profile.server.to_string(),
+                    dry_run: false,
+                    created: true,
+                    board: DeckBoardCreatePreview {
+                        id: Some(created.id),
+                        title: created.title.unwrap_or_default(),
+                        color: created.color.unwrap_or_default(),
+                    },
+                });
+            }
+
             let boards = match deck.boards().await {
                 Ok(boards) => boards,
                 Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
@@ -1849,6 +1919,25 @@ async fn handle_deck(
             })
         }
     }
+}
+
+fn build_deck_board_create_options(
+    args: &commands::DeckBoardCreateArgs,
+) -> CliResult<nextcloud::DeckBoardCreateOptions> {
+    Ok(nextcloud::DeckBoardCreateOptions {
+        title: args.title.clone(),
+        color: normalize_deck_color(args.color.as_deref().unwrap_or("0082c9"))?,
+    })
+}
+
+fn normalize_deck_color(value: &str) -> CliResult<String> {
+    let color = value.trim().trim_start_matches('#').to_ascii_lowercase();
+    if color.len() == 6 && color.chars().all(|character| character.is_ascii_hexdigit()) {
+        return Ok(color);
+    }
+    Err(CliError::InvalidDeckColor {
+        value: value.to_owned(),
+    })
 }
 
 fn resolve_calendar_range(args: &CalendarEventsArgs) -> CliResult<CalendarRangeOutput> {
@@ -2344,6 +2433,23 @@ struct DeckBoardsOutput {
     details: bool,
     boards: Vec<nextcloud::DeckBoard>,
     count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckBoardCreateOutput {
+    profile: String,
+    server: String,
+    dry_run: bool,
+    created: bool,
+    board: DeckBoardCreatePreview,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckBoardCreatePreview {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    title: String,
+    color: String,
 }
 
 #[derive(Debug, Serialize)]

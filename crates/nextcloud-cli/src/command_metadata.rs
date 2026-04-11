@@ -203,6 +203,11 @@ pub fn command_schema() -> CommandSchema {
                 "DeckBoardsResult",
             ),
             stable(
+                "deck boards create",
+                "Create a Deck board through the Nextcloud Deck API, with dry-run support.",
+                "DeckBoardCreateResult",
+            ),
+            stable(
                 "deck cards",
                 "List cards for a Deck board by flattening stack card arrays.",
                 "DeckCardsResult",
