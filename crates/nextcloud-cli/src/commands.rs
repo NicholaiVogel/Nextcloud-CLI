@@ -72,6 +72,9 @@ pub enum Command {
     Deck(DeckCommand),
 
     #[command(subcommand)]
+    Smoke(SmokeCommand),
+
+    #[command(subcommand)]
     Update(UpdateCommand),
 }
 
@@ -542,6 +545,26 @@ pub enum DeckCommand {
     #[command(subcommand)]
     Stacks(DeckStacksCommand),
     Cards(DeckCardsArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SmokeCommand {
+    Run(SmokeRunArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct SmokeRunArgs {
+    #[arg(long, default_value = "/")]
+    pub files_path: String,
+
+    #[arg(long, default_value_t = false)]
+    pub skip_optional: bool,
+
+    #[arg(long, default_value_t = 7)]
+    pub calendar_days: u32,
+
+    #[arg(long, default_value = "zzzz-nextcloud-cli-smoke-no-match")]
+    pub contacts_query: String,
 }
 
 #[derive(Debug, Args)]

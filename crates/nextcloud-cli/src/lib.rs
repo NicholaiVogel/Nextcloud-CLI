@@ -9,6 +9,7 @@ mod output;
 use chrono::{DateTime, Days, Local, LocalResult, NaiveDate, TimeZone, Utc};
 use clap::Parser;
 use std::fs;
+use std::future::Future;
 use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
@@ -21,7 +22,7 @@ use commands::{
     ActivityCommand, AuthAppPasswordArgs, AuthCommand, CalendarCommand, CalendarEventsArgs, Cli,
     Command, CommandsCommand, ConfigCommand, ContactsCommand, DeckCommand, FilesCommand,
     NotesCommand, ProfilePolicySetArgs, ProfilesCommand, ServerCommand, SharesCommand,
-    UpdateCommand,
+    SmokeCommand, UpdateCommand,
 };
 use credential_store::CredentialStore;
 use error::{CliError, CliResult};
@@ -147,6 +148,9 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 &credential_store,
             )
             .await
+        }
+        Command::Smoke(SmokeCommand::Run(args)) => {
+            handle_smoke_run(args, selected_profile.as_deref(), &store, &credential_store).await
         }
         Command::Update(UpdateCommand::Check) => json_value(UpdateCheck {
             current_version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -2239,6 +2243,209 @@ async fn handle_deck(
     }
 }
 
+async fn handle_smoke_run(
+    args: commands::SmokeRunArgs,
+    selected_profile: Option<&str>,
+    store: &ConfigStore,
+    credential_store: &CredentialStore,
+) -> CliResult<Value> {
+    let profile = store.selected_profile(selected_profile)?;
+    let app_password = credential_store.get_app_password(&profile.credential)?;
+    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let mut checks = Vec::new();
+
+    let capabilities = CapabilitiesClient::new(client.clone());
+    push_smoke_check(
+        &mut checks,
+        "server.status",
+        true,
+        || capabilities.server_status(),
+        |_| None,
+    )
+    .await;
+
+    let capabilities = CapabilitiesClient::new(client.clone());
+    push_smoke_check(
+        &mut checks,
+        "server.capabilities",
+        true,
+        || capabilities.capabilities(),
+        |_| None,
+    )
+    .await;
+
+    let files = WebDavClient::new(client.clone(), profile.username.clone());
+    let files_path = args.files_path.clone();
+    push_smoke_check(
+        &mut checks,
+        "files.list",
+        true,
+        || files.list(&files_path),
+        |entries| Some(entries.len()),
+    )
+    .await;
+
+    let shares = SharesClient::new(client.clone());
+    let share_options = nextcloud::ShareListOptions::default();
+    push_smoke_check(
+        &mut checks,
+        "shares.list",
+        true,
+        || async { shares.list(&share_options).await },
+        |shares| Some(shares.len()),
+    )
+    .await;
+
+    if args.skip_optional {
+        for name in [
+            "calendar.events",
+            "contacts.search",
+            "activity.recent",
+            "notes.list",
+            "deck.boards",
+            "deck.cards",
+        ] {
+            checks.push(SmokeCheck::skipped(name, false));
+        }
+    } else {
+        let calendar = nextcloud::CalendarClient::new(client.clone(), profile.username.clone());
+        let from = Utc::now();
+        let to = from + chrono::Duration::days(i64::from(args.calendar_days.max(1)));
+        let calendar_options = nextcloud::CalendarEventsOptions {
+            from,
+            to,
+            calendar: None,
+        };
+        push_smoke_check(
+            &mut checks,
+            "calendar.events",
+            false,
+            || async { calendar.events(&calendar_options).await },
+            |events| Some(events.len()),
+        )
+        .await;
+
+        let contacts = nextcloud::ContactsClient::new(client.clone(), profile.username.clone());
+        let contact_options = nextcloud::ContactSearchOptions {
+            query: args.contacts_query.clone(),
+            limit: 1,
+            addressbook: None,
+        };
+        push_smoke_check(
+            &mut checks,
+            "contacts.search",
+            false,
+            || async { contacts.search(&contact_options).await },
+            |contacts| Some(contacts.len()),
+        )
+        .await;
+
+        let activity = nextcloud::ActivityClient::new(client.clone());
+        push_smoke_check(
+            &mut checks,
+            "activity.recent",
+            false,
+            || activity.recent(&nextcloud::ActivityRecentOptions { limit: 1 }),
+            |items| Some(items.len()),
+        )
+        .await;
+
+        let notes = nextcloud::NotesClient::new(client.clone());
+        push_smoke_check(
+            &mut checks,
+            "notes.list",
+            false,
+            || {
+                notes.list(&nextcloud::NotesListOptions {
+                    category: None,
+                    exclude_content: true,
+                    limit: 1,
+                })
+            },
+            |notes| Some(notes.len()),
+        )
+        .await;
+
+        let deck = nextcloud::DeckClient::new(client);
+        let started = Instant::now();
+        match deck.boards().await {
+            Ok(boards) => {
+                let duration_ms = started.elapsed().as_millis() as u64;
+                let first_board_id = boards.first().map(|board| board.id.clone());
+                checks.push(SmokeCheck::passed(
+                    "deck.boards",
+                    false,
+                    duration_ms,
+                    Some(boards.len()),
+                ));
+                if let Some(board_id) = first_board_id {
+                    let card_options = nextcloud::DeckCardsOptions {
+                        board_id,
+                        include_archived: false,
+                    };
+                    push_smoke_check(
+                        &mut checks,
+                        "deck.cards",
+                        false,
+                        || async { deck.cards(&card_options).await },
+                        |cards| Some(cards.len()),
+                    )
+                    .await;
+                } else {
+                    checks.push(SmokeCheck::skipped("deck.cards", false));
+                }
+            }
+            Err(error) => {
+                let duration_ms = started.elapsed().as_millis() as u64;
+                checks.push(SmokeCheck::from_error(
+                    "deck.boards",
+                    false,
+                    duration_ms,
+                    &error,
+                ));
+                checks.push(SmokeCheck::skipped("deck.cards", false));
+            }
+        }
+    }
+
+    let summary = SmokeSummary::from_checks(&checks);
+    json_value(SmokeRunOutput {
+        profile: profile.name,
+        server: profile.server.to_string(),
+        ok: summary.failed_required == 0,
+        checks,
+        summary,
+    })
+}
+
+async fn push_smoke_check<T, Fut, F, C>(
+    checks: &mut Vec<SmokeCheck>,
+    name: &'static str,
+    required: bool,
+    operation: F,
+    count: C,
+) where
+    Fut: Future<Output = nextcloud::Result<T>>,
+    F: FnOnce() -> Fut,
+    C: FnOnce(&T) -> Option<usize>,
+{
+    let started = Instant::now();
+    match operation().await {
+        Ok(value) => checks.push(SmokeCheck::passed(
+            name,
+            required,
+            started.elapsed().as_millis() as u64,
+            count(&value),
+        )),
+        Err(error) => checks.push(SmokeCheck::from_error(
+            name,
+            required,
+            started.elapsed().as_millis() as u64,
+            &error,
+        )),
+    }
+}
+
 fn build_deck_board_create_options(
     args: &commands::DeckBoardCreateArgs,
 ) -> CliResult<nextcloud::DeckBoardCreateOptions> {
@@ -3121,6 +3328,141 @@ struct ShareDeleteOutput {
     deleted: bool,
     confirmed: bool,
     command: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SmokeRunOutput {
+    profile: String,
+    server: String,
+    ok: bool,
+    checks: Vec<SmokeCheck>,
+    summary: SmokeSummary,
+}
+
+#[derive(Debug, Serialize)]
+struct SmokeCheck {
+    name: &'static str,
+    required: bool,
+    status: &'static str,
+    duration_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<SmokeError>,
+}
+
+impl SmokeCheck {
+    fn passed(name: &'static str, required: bool, duration_ms: u64, count: Option<usize>) -> Self {
+        Self {
+            name,
+            required,
+            status: "passed",
+            duration_ms,
+            count,
+            error: None,
+        }
+    }
+
+    fn skipped(name: &'static str, required: bool) -> Self {
+        Self {
+            name,
+            required,
+            status: "skipped",
+            duration_ms: 0,
+            count: None,
+            error: None,
+        }
+    }
+
+    fn from_error(
+        name: &'static str,
+        required: bool,
+        duration_ms: u64,
+        error: &nextcloud::Error,
+    ) -> Self {
+        let status = if !required && is_optional_app_unavailable(error) {
+            "unavailable"
+        } else {
+            "failed"
+        };
+        Self {
+            name,
+            required,
+            status,
+            duration_ms,
+            count: None,
+            error: Some(SmokeError::from(error)),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct SmokeError {
+    code: &'static str,
+    message: String,
+}
+
+impl From<&nextcloud::Error> for SmokeError {
+    fn from(error: &nextcloud::Error) -> Self {
+        let message = match error {
+            nextcloud::Error::HttpStatus { status, .. } => {
+                format!("server returned HTTP {status}")
+            }
+            nextcloud::Error::Http(_) => "network request failed".to_owned(),
+            nextcloud::Error::OcsStatus {
+                status,
+                status_code,
+                ..
+            } => format!("OCS request failed with status {status_code} ({status})"),
+            _ => error.to_string(),
+        };
+        Self {
+            code: error.code(),
+            message,
+        }
+    }
+}
+
+fn is_optional_app_unavailable(error: &nextcloud::Error) -> bool {
+    matches!(error, nextcloud::Error::HttpStatus { status, .. } if status.as_u16() == 404)
+}
+
+#[derive(Debug, Serialize)]
+struct SmokeSummary {
+    total: usize,
+    passed: usize,
+    failed: usize,
+    failed_required: usize,
+    unavailable: usize,
+    skipped: usize,
+}
+
+impl SmokeSummary {
+    fn from_checks(checks: &[SmokeCheck]) -> Self {
+        Self {
+            total: checks.len(),
+            passed: checks
+                .iter()
+                .filter(|check| check.status == "passed")
+                .count(),
+            failed: checks
+                .iter()
+                .filter(|check| check.status == "failed")
+                .count(),
+            failed_required: checks
+                .iter()
+                .filter(|check| check.required && check.status == "failed")
+                .count(),
+            unavailable: checks
+                .iter()
+                .filter(|check| check.status == "unavailable")
+                .count(),
+            skipped: checks
+                .iter()
+                .filter(|check| check.status == "skipped")
+                .count(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

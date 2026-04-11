@@ -4258,7 +4258,22 @@ Required fixtures:
 
 ### 33.4 Real-server smoke tests
 
-The smoke suite should be runnable manually with environment variables:
+The smoke suite has two layers. The implemented CLI smoke report runs safe read
+checks and dry-run-style optional app probes from an existing profile:
+
+```bash
+nextcloud-cli --profile personal smoke run --format json
+nextcloud-cli --profile personal smoke run --skip-optional --format json
+```
+
+Status: `smoke run` is implemented. It reports redacted check status and counts
+for server status, capabilities, files list, shares list, and optional
+calendar/contacts/activity/notes/deck checks. It does not print private item
+contents. The full artifact-creating smoke test remains planned as an opt-in
+test harness.
+
+The artifact-creating smoke suite should be runnable manually with environment
+variables:
 
 ```bash
 NEXTCLOUD_URL=https://cloud.example.com \
@@ -5397,6 +5412,7 @@ Deliverables:
 - setup agent skill: pending
 - basic feature skills: pending
 - terminal art assets and output gating: pending
+- built-in smoke report: implemented for safe read checks via `smoke run`
 
 Completion signal:
 

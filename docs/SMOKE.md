@@ -1,5 +1,38 @@
 # Smoke Tests
 
+Built-in smoke report:
+
+```bash
+cargo run -p nextcloud-cli -- --profile personal smoke run --format json
+```
+
+`smoke run` performs safe read checks and returns a redacted JSON report. It
+prints counts and status only, not file names, share links, contact details,
+calendar contents, note bodies, Deck board names, or card descriptions.
+
+Required checks:
+
+- `server.status`
+- `server.capabilities`
+- `files.list`
+- `shares.list`
+
+Optional checks:
+
+- `calendar.events`
+- `contacts.search`
+- `activity.recent`
+- `notes.list`
+- `deck.boards`
+- `deck.cards`
+
+Optional apps that return 404 are reported as `unavailable`, not as required
+failures. Use `--skip-optional` to run only the required core checks:
+
+```bash
+cargo run -p nextcloud-cli -- --profile personal smoke run --skip-optional --format json
+```
+
 Local spine checks:
 
 ```bash

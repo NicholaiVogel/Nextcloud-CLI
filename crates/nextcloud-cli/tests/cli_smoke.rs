@@ -20,6 +20,13 @@ fn commands_schema_is_json() -> Result<(), Box<dyn std::error::Error>> {
             .iter()
             .any(|command| command["name"] == "shares list")
     );
+    assert!(
+        value["commands"]
+            .as_array()
+            .expect("commands array")
+            .iter()
+            .any(|command| command["name"] == "smoke run")
+    );
     Ok(())
 }
 
@@ -1688,6 +1695,18 @@ fn deck_card_archive_and_delete_require_confirmation_and_support_dry_run()
             .success()
             .stdout(predicate::str::contains("\"confirmed\": false"));
     }
+
+    Ok(())
+}
+
+#[test]
+fn smoke_run_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    Command::cargo_bin("nextcloud-cli")?
+        .args(["smoke", "run", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--files-path"))
+        .stdout(predicate::str::contains("--skip-optional"));
 
     Ok(())
 }

@@ -76,8 +76,9 @@ convenience hacks.
   broader optional-app smoke cleanup.
 - Phase 6: distribution and agent experience, partially implemented. README,
   command metadata, CI, `nxc` alias, tagged GitHub release packaging, and
-  placeholder `update check` exist. npm wrapper, curl installer, real
-  self-update, and agent skills remain planned.
+  placeholder `update check` exist. `smoke run` exists for safe redacted
+  live-server health reports. npm wrapper, curl installer, real self-update, and
+  agent skills remain planned.
 
 When continuing autonomously, complete the next smallest vertical slice,
 validate it, smoke it safely, commit it, push it, then update memory.

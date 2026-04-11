@@ -243,6 +243,11 @@ pub fn command_schema() -> CommandSchema {
                 "DeckCardDeleteResult",
             ),
             stable(
+                "smoke run",
+                "Run safe server smoke checks and return a redacted JSON report.",
+                "SmokeRunResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",
