@@ -3,6 +3,7 @@
 //! The CLI crate owns terminal UX and command parsing. This crate owns stable
 //! data models, configuration layout, API clients, and protocol-specific helpers.
 
+pub mod activity;
 pub mod auth;
 pub mod calendar;
 pub mod capabilities;
@@ -15,6 +16,7 @@ pub mod ocs;
 pub mod shares;
 pub mod webdav;
 
+pub use activity::{ActivityClient, ActivityItem, ActivityRecentOptions};
 pub use auth::{
     AppPasswordClient, AppPasswordCredentials, LoginFlowV2Client, LoginFlowV2Credentials,
     LoginFlowV2Poll, LoginFlowV2Start,

@@ -63,6 +63,9 @@ pub enum Command {
     Contacts(ContactsCommand),
 
     #[command(subcommand)]
+    Activity(ActivityCommand),
+
+    #[command(subcommand)]
     Update(UpdateCommand),
 }
 
@@ -448,6 +451,17 @@ pub struct ContactsDeleteArgs {
 
     #[arg(long, default_value_t = false)]
     pub yes: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ActivityCommand {
+    Recent(ActivityRecentArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ActivityRecentArgs {
+    #[arg(long, default_value_t = 20)]
+    pub limit: u32,
 }
 
 #[derive(Debug, Subcommand)]

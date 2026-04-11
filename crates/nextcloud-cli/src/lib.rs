@@ -18,8 +18,8 @@ use zeroize::Zeroizing;
 use audit::{command_executed, record, remote_path_target, share_id_target, target};
 use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
-    AuthAppPasswordArgs, AuthCommand, CalendarCommand, CalendarEventsArgs, Cli, Command,
-    CommandsCommand, ConfigCommand, ContactsCommand, FilesCommand, ProfilePolicySetArgs,
+    ActivityCommand, AuthAppPasswordArgs, AuthCommand, CalendarCommand, CalendarEventsArgs, Cli,
+    Command, CommandsCommand, ConfigCommand, ContactsCommand, FilesCommand, ProfilePolicySetArgs,
     ProfilesCommand, ServerCommand, SharesCommand, UpdateCommand,
 };
 use credential_store::CredentialStore;
@@ -113,6 +113,15 @@ async fn run(cli: Cli) -> CliResult<Value> {
         }
         Command::Contacts(command) => {
             handle_contacts(
+                command,
+                selected_profile.as_deref(),
+                &store,
+                &credential_store,
+            )
+            .await
+        }
+        Command::Activity(command) => {
+            handle_activity(
                 command,
                 selected_profile.as_deref(),
                 &store,
@@ -1442,6 +1451,37 @@ fn build_contact_create_options(
     }
 }
 
+async fn handle_activity(
+    command: ActivityCommand,
+    selected_profile: Option<&str>,
+    store: &ConfigStore,
+    credential_store: &CredentialStore,
+) -> CliResult<Value> {
+    let profile = store.selected_profile(selected_profile)?;
+    let app_password = credential_store.get_app_password(&profile.credential)?;
+    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let activity = nextcloud::ActivityClient::new(client);
+
+    match command {
+        ActivityCommand::Recent(args) => {
+            if args.limit == 0 || args.limit > 100 {
+                return Err(CliError::InvalidLimit { value: args.limit });
+            }
+            let activities = activity
+                .recent(&nextcloud::ActivityRecentOptions { limit: args.limit })
+                .await?;
+            let count = activities.len();
+            json_value(ActivityRecentOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                limit: args.limit,
+                activities,
+                count,
+            })
+        }
+    }
+}
+
 fn resolve_calendar_range(args: &CalendarEventsArgs) -> CliResult<CalendarRangeOutput> {
     if let Some(date) = &args.date {
         return resolve_calendar_date(date);
@@ -1833,6 +1873,15 @@ struct ContactsCreatePreview {
     email_count: usize,
     phone_count: usize,
     organization_present: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ActivityRecentOutput {
+    profile: String,
+    server: String,
+    limit: u32,
+    activities: Vec<nextcloud::ActivityItem>,
+    count: usize,
 }
 
 #[derive(Debug, Serialize)]

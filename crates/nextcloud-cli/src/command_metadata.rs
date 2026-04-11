@@ -173,6 +173,11 @@ pub fn command_schema() -> CommandSchema {
                 "ContactsDeleteResult",
             ),
             stable(
+                "activity recent",
+                "List recent activity through the Nextcloud Activity OCS API.",
+                "ActivityRecentResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

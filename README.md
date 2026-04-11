@@ -196,6 +196,7 @@ Current commands:
 | Shares | `shares list`, `shares create --public`, `shares delete`, `shares revoke` |
 | Calendar | `calendar events`, `calendar create`, `calendar delete` |
 | Contacts | `contacts search`, `contacts create`, `contacts delete` |
+| Activity | `activity recent` |
 | Updates | `update check` |
 
 See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the implemented command list and

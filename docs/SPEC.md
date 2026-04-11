@@ -2164,6 +2164,9 @@ Behavior:
 - Request JSON format.
 - Normalize the Activity OCS response into common activity objects.
 - If Activity is unavailable, return `app_unavailable` with source `activity`.
+- Status: `activity recent [--limit <n>]` is implemented for the base Activity
+  OCS v2 endpoint. `--since`, filters, and unavailable-app mapping remain
+  planned.
 
 Expected output:
 
@@ -5320,7 +5323,7 @@ Deliverables:
 
 - Notes read/write commands
 - Deck board, stack, and card commands
-- Activity feed command
+- Activity feed command: implemented for `activity recent --limit <n>`
 - optional app unavailable mapping
 - smoke report fields for enabled and unavailable apps
 
