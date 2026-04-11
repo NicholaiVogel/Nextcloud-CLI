@@ -188,6 +188,11 @@ pub fn command_schema() -> CommandSchema {
                 "NotesCreateResult",
             ),
             stable(
+                "notes delete",
+                "Delete a note through the Nextcloud Notes API with dry-run and confirmation.",
+                "NotesDeleteResult",
+            ),
+            stable(
                 "deck boards",
                 "List Deck boards through the Nextcloud Deck API.",
                 "DeckBoardsResult",

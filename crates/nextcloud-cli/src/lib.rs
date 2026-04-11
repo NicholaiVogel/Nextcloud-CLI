@@ -1612,6 +1612,71 @@ async fn handle_notes(
                 note: NoteWriteSummary::from_note(&created),
             })
         }
+        NotesCommand::Delete(args) => {
+            if args.dry_run {
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "notes.delete",
+                        true,
+                        "DELETE",
+                        "/index.php/apps/notes/api/v1/notes/{note-id}",
+                        target([("note_id", json!(args.note_id.clone()))]),
+                    ),
+                );
+                return json_value(DeleteObjectOutput {
+                    profile: profile.name,
+                    server: profile.server.to_string(),
+                    command: "notes delete".to_owned(),
+                    object_type: "note".to_owned(),
+                    collection: "notes".to_owned(),
+                    id: args.note_id,
+                    dry_run: true,
+                    deleted: false,
+                    confirmed: false,
+                });
+            }
+
+            if !args.yes {
+                return Err(CliError::ConfirmationRequired);
+            }
+
+            match notes_client.delete(&args.note_id).await {
+                Ok(()) => {}
+                Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
+                    return Err(CliError::AppUnavailable {
+                        app: "notes".to_owned(),
+                        api_source: "notes".to_owned(),
+                    });
+                }
+                Err(error) => return Err(error.into()),
+            }
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "notes.delete",
+                    false,
+                    "DELETE",
+                    "/index.php/apps/notes/api/v1/notes/{note-id}",
+                    target([("note_id", json!(args.note_id.clone()))]),
+                ),
+            );
+            json_value(DeleteObjectOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                command: "notes delete".to_owned(),
+                object_type: "note".to_owned(),
+                collection: "notes".to_owned(),
+                id: args.note_id,
+                dry_run: false,
+                deleted: true,
+                confirmed: true,
+            })
+        }
     }
 }
 

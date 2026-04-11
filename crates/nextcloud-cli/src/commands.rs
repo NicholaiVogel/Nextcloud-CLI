@@ -474,6 +474,7 @@ pub struct ActivityRecentArgs {
 pub enum NotesCommand {
     List(NotesListArgs),
     Create(NotesCreateArgs),
+    Delete(NotesDeleteArgs),
 }
 
 #[derive(Debug, Args)]
@@ -504,6 +505,17 @@ pub struct NotesCreateArgs {
 
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct NotesDeleteArgs {
+    pub note_id: String,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub yes: bool,
 }
 
 #[derive(Debug, Subcommand)]

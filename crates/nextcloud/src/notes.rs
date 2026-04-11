@@ -60,6 +60,14 @@ impl NotesClient {
             .await?;
         Ok(Note::from(raw))
     }
+
+    pub async fn delete(&self, id: &str) -> Result<()> {
+        let path = format!("{NOTES_ENDPOINT}/{id}");
+        self.client
+            .request_text(Method::DELETE, &path, None)
+            .await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

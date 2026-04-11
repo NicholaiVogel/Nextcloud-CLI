@@ -1967,6 +1967,8 @@ Behavior:
 - Safety class is `destructive`.
 - Non-interactive contexts require `--yes`.
 - Support `--dry-run`.
+- Status: `notes delete <note-id> [--dry-run] [--yes]` is implemented with
+  confirmation and dry-run audit behavior.
 
 Completion gate:
 
@@ -5333,7 +5335,8 @@ nextcloud-cli calendar create --calendar personal --summary Test --starts-at 202
 
 Deliverables:
 
-- Notes read/write commands: `notes list` and `notes create` implemented
+- Notes read/write commands: `notes list`, `notes create`, and `notes delete`
+  implemented
 - Deck board, stack, and card commands: `deck boards` and `deck cards`
   implemented for read-only board/card listing
 - Activity feed command: implemented for `activity recent --limit <n>`
@@ -5345,6 +5348,7 @@ Completion signal:
 ```bash
 nextcloud-cli notes list --exclude-content --format json
 nextcloud-cli notes create --title "Smoke" --content "test" --dry-run --format json
+nextcloud-cli notes delete 1 --dry-run --format json
 nextcloud-cli deck boards --format json
 nextcloud-cli deck cards --board 1 --format json
 nextcloud-cli activity recent --limit 20 --format json
