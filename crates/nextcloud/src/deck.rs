@@ -78,6 +78,28 @@ impl DeckClient {
         }
         Ok(cards)
     }
+
+    pub async fn create_card(&self, options: &DeckCardCreateOptions) -> Result<DeckCard> {
+        let path = format!(
+            "index.php/apps/deck/api/v1.0/boards/{}/stacks/{}/cards",
+            options.board_id, options.stack_id
+        );
+        let raw: RawDeckCard = self
+            .client
+            .request_json_with_ocs_header(
+                Method::POST,
+                &path,
+                &DeckCardCreateRequest {
+                    title: options.title.as_str(),
+                    card_type: "plain",
+                    order: options.order,
+                    description: options.description.as_deref(),
+                    duedate: options.due_at.as_deref(),
+                },
+            )
+            .await?;
+        Ok(DeckCard::from_raw(raw, options.stack_id.clone(), None))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -138,6 +160,16 @@ pub struct DeckCard {
     pub deleted: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeckCardCreateOptions {
+    pub board_id: String,
+    pub stack_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub due_at: Option<String>,
+    pub order: Option<i64>,
+}
+
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 struct RawDeckBoard {
     #[serde(flatten)]
@@ -167,6 +199,19 @@ struct DeckStackCreateRequest<'a> {
     title: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     order: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckCardCreateRequest<'a> {
+    title: &'a str,
+    #[serde(rename = "type")]
+    card_type: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    order: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duedate: Option<&'a str>,
 }
 
 impl From<RawDeckBoard> for DeckBoard {
@@ -435,5 +480,22 @@ mod tests {
         let value = serde_json::to_value(request).expect("serializes");
         assert_eq!(value["title"], "Doing");
         assert_eq!(value["order"], 100);
+    }
+
+    #[test]
+    fn serializes_card_create_request() {
+        let request = DeckCardCreateRequest {
+            title: "Ship CLI",
+            card_type: "plain",
+            order: Some(999),
+            description: Some("private body"),
+            duedate: Some("2026-04-10T12:00:00+00:00"),
+        };
+        let value = serde_json::to_value(request).expect("serializes");
+        assert_eq!(value["title"], "Ship CLI");
+        assert_eq!(value["type"], "plain");
+        assert_eq!(value["order"], 999);
+        assert_eq!(value["description"], "private body");
+        assert_eq!(value["duedate"], "2026-04-10T12:00:00+00:00");
     }
 }

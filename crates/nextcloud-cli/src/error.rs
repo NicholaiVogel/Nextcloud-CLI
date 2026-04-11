@@ -90,6 +90,9 @@ pub enum CliError {
     )]
     InvalidDeckColor { value: String },
 
+    #[error("deck cards listing requires --board <id>")]
+    MissingDeckBoard,
+
     #[error("Nextcloud app `{app}` is unavailable for source `{api_source}`")]
     AppUnavailable { app: String, api_source: String },
 
@@ -175,6 +178,7 @@ impl CliError {
             Self::ConflictingNoteContentSources => "conflicting_note_content_sources",
             Self::NoNoteUpdateFields => "no_note_update_fields",
             Self::InvalidDeckColor { .. } => "invalid_deck_color",
+            Self::MissingDeckBoard => "missing_deck_board",
             Self::AppUnavailable { .. } => "app_unavailable",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
@@ -217,6 +221,7 @@ impl CliError {
             Self::ConflictingNoteContentSources => 2,
             Self::NoNoteUpdateFields => 2,
             Self::InvalidDeckColor { .. } => 2,
+            Self::MissingDeckBoard => 2,
             Self::AppUnavailable { .. } => 6,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::OcsStatus { .. }) => 6,

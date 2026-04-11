@@ -592,11 +592,43 @@ pub struct DeckStackCreateArgs {
 
 #[derive(Debug, Args)]
 pub struct DeckCardsArgs {
+    #[command(subcommand)]
+    pub command: Option<DeckCardsCommand>,
+
     #[arg(long)]
-    pub board: String,
+    pub board: Option<String>,
 
     #[arg(long, default_value_t = false)]
     pub include_archived: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DeckCardsCommand {
+    Create(DeckCardCreateArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct DeckCardCreateArgs {
+    #[arg(long)]
+    pub board: String,
+
+    #[arg(long)]
+    pub stack: String,
+
+    #[arg(long)]
+    pub title: String,
+
+    #[arg(long)]
+    pub description: Option<String>,
+
+    #[arg(long)]
+    pub due_at: Option<String>,
+
+    #[arg(long)]
+    pub order: Option<i64>,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Subcommand)]

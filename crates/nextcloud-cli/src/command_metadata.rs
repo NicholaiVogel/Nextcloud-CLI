@@ -218,6 +218,11 @@ pub fn command_schema() -> CommandSchema {
                 "DeckCardsResult",
             ),
             stable(
+                "deck cards create",
+                "Create a Deck card in an existing stack, with dry-run support.",
+                "DeckCardCreateResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

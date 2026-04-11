@@ -1433,7 +1433,62 @@ fn deck_cards_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
         .assert()
         .success()
         .stdout(predicate::str::contains("--board"))
-        .stdout(predicate::str::contains("--include-archived"));
+        .stdout(predicate::str::contains("--include-archived"))
+        .stdout(predicate::str::contains("create"));
+
+    Ok(())
+}
+
+#[test]
+fn deck_card_create_dry_run_hides_description() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "deck",
+            "cards",
+            "create",
+            "--board",
+            "10",
+            "--stack",
+            "4",
+            "--title",
+            "Ship CLI",
+            "--description",
+            "private card description",
+            "--order",
+            "999",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"created\": false"))
+        .stdout(predicate::str::contains("\"description_present\": true"))
+        .stdout(predicate::str::contains("private card description").not());
 
     Ok(())
 }
