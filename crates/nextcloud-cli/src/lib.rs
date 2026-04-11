@@ -2106,6 +2106,106 @@ async fn handle_deck(
                             card: DeckCardWritePreview::from_card(&updated),
                         });
                     }
+                    commands::DeckCardsCommand::Move(move_args) => {
+                        let card = build_deck_card_move_options(&move_args);
+                        if move_args.dry_run {
+                            record(
+                                store.paths(),
+                                &command_executed(
+                                    &profile.name,
+                                    profile.server.as_str(),
+                                    "deck.cards.move",
+                                    true,
+                                    "PUT",
+                                    "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards/{card-id}/reorder",
+                                    target([
+                                        ("board_id", json!(card.board_id.clone())),
+                                        ("from_stack_id", json!(card.from_stack_id.clone())),
+                                        ("to_stack_id", json!(card.to_stack_id.clone())),
+                                        ("card_id", json!(card.card_id.clone())),
+                                        ("order", json!(card.order)),
+                                    ]),
+                                ),
+                            );
+                            return json_value(DeckCardMoveOutput {
+                                profile: profile.name,
+                                server: profile.server.to_string(),
+                                dry_run: true,
+                                moved: false,
+                                card_id: card.card_id,
+                                board_id: card.board_id,
+                                from_stack_id: card.from_stack_id,
+                                to_stack_id: card.to_stack_id,
+                                order: card.order,
+                            });
+                        }
+
+                        match deck.move_card(&card).await {
+                            Ok(()) => {}
+                            Err(nextcloud::Error::HttpStatus { status, .. })
+                                if status.as_u16() == 404 =>
+                            {
+                                return Err(CliError::AppUnavailable {
+                                    app: "deck".to_owned(),
+                                    api_source: "deck".to_owned(),
+                                });
+                            }
+                            Err(error) => return Err(error.into()),
+                        }
+                        record(
+                            store.paths(),
+                            &command_executed(
+                                &profile.name,
+                                profile.server.as_str(),
+                                "deck.cards.move",
+                                false,
+                                "PUT",
+                                "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards/{card-id}/reorder",
+                                target([
+                                    ("board_id", json!(card.board_id.clone())),
+                                    ("from_stack_id", json!(card.from_stack_id.clone())),
+                                    ("to_stack_id", json!(card.to_stack_id.clone())),
+                                    ("card_id", json!(card.card_id.clone())),
+                                    ("order", json!(card.order)),
+                                ]),
+                            ),
+                        );
+                        return json_value(DeckCardMoveOutput {
+                            profile: profile.name,
+                            server: profile.server.to_string(),
+                            dry_run: false,
+                            moved: true,
+                            card_id: card.card_id,
+                            board_id: card.board_id,
+                            from_stack_id: card.from_stack_id,
+                            to_stack_id: card.to_stack_id,
+                            order: card.order,
+                        });
+                    }
+                    commands::DeckCardsCommand::Archive(args) => {
+                        return handle_deck_card_ref(
+                            &profile,
+                            store,
+                            &deck,
+                            build_deck_card_ref_options(&args),
+                            args.dry_run,
+                            args.yes,
+                            DeckCardRefAction::Archive,
+                        )
+                        .await;
+                    }
+                    commands::DeckCardsCommand::Delete(args) => {
+                        return handle_deck_card_ref(
+                            &profile,
+                            store,
+                            &deck,
+                            build_deck_card_ref_options(&args),
+                            args.dry_run,
+                            args.yes,
+                            DeckCardRefAction::Delete,
+                        )
+                        .await;
+                    }
                 }
             }
 
@@ -2189,6 +2289,164 @@ fn build_deck_card_update_options(
         description: args.description.clone(),
         due_at: args.due_at.clone(),
         order: args.order,
+    })
+}
+
+fn build_deck_card_move_options(
+    args: &commands::DeckCardMoveArgs,
+) -> nextcloud::DeckCardMoveOptions {
+    nextcloud::DeckCardMoveOptions {
+        board_id: args.board.clone(),
+        from_stack_id: args.from_stack.clone(),
+        to_stack_id: args.to_stack.clone(),
+        card_id: args.card_id.clone(),
+        order: args.order,
+    }
+}
+
+fn build_deck_card_ref_options(args: &commands::DeckCardRefArgs) -> nextcloud::DeckCardRefOptions {
+    nextcloud::DeckCardRefOptions {
+        board_id: args.board.clone(),
+        stack_id: args.stack.clone(),
+        card_id: args.card_id.clone(),
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum DeckCardRefAction {
+    Archive,
+    Delete,
+}
+
+impl DeckCardRefAction {
+    fn command(self) -> &'static str {
+        match self {
+            Self::Archive => "deck cards archive",
+            Self::Delete => "deck cards delete",
+        }
+    }
+
+    fn command_key(self) -> &'static str {
+        match self {
+            Self::Archive => "deck.cards.archive",
+            Self::Delete => "deck.cards.delete",
+        }
+    }
+
+    fn method(self) -> &'static str {
+        match self {
+            Self::Archive => "PUT",
+            Self::Delete => "DELETE",
+        }
+    }
+
+    fn endpoint(self) -> &'static str {
+        match self {
+            Self::Archive => {
+                "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards/{card-id}/archive"
+            }
+            Self::Delete => {
+                "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards/{card-id}"
+            }
+        }
+    }
+
+    fn output(self, dry_run: bool, confirmed: bool) -> (bool, bool, bool) {
+        match self {
+            Self::Archive => (!dry_run, false, confirmed),
+            Self::Delete => (false, !dry_run, confirmed),
+        }
+    }
+}
+
+async fn handle_deck_card_ref(
+    profile: &Profile,
+    store: &ConfigStore,
+    deck: &nextcloud::DeckClient,
+    card: nextcloud::DeckCardRefOptions,
+    dry_run: bool,
+    yes: bool,
+    action: DeckCardRefAction,
+) -> CliResult<Value> {
+    if dry_run {
+        record(
+            store.paths(),
+            &command_executed(
+                &profile.name,
+                profile.server.as_str(),
+                action.command_key(),
+                true,
+                action.method(),
+                action.endpoint(),
+                target([
+                    ("board_id", json!(card.board_id.clone())),
+                    ("stack_id", json!(card.stack_id.clone())),
+                    ("card_id", json!(card.card_id.clone())),
+                ]),
+            ),
+        );
+        let (archived, deleted, confirmed) = action.output(true, false);
+        return json_value(DeckCardRefOutput {
+            profile: profile.name.clone(),
+            server: profile.server.to_string(),
+            command: action.command().to_owned(),
+            board_id: card.board_id,
+            stack_id: card.stack_id,
+            card_id: card.card_id,
+            dry_run: true,
+            archived,
+            deleted,
+            confirmed,
+        });
+    }
+
+    if !yes {
+        return Err(CliError::ConfirmationRequired);
+    }
+
+    let result = match action {
+        DeckCardRefAction::Archive => deck.archive_card(&card).await,
+        DeckCardRefAction::Delete => deck.delete_card(&card).await,
+    };
+    match result {
+        Ok(()) => {}
+        Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
+            return Err(CliError::AppUnavailable {
+                app: "deck".to_owned(),
+                api_source: "deck".to_owned(),
+            });
+        }
+        Err(error) => return Err(error.into()),
+    }
+
+    record(
+        store.paths(),
+        &command_executed(
+            &profile.name,
+            profile.server.as_str(),
+            action.command_key(),
+            false,
+            action.method(),
+            action.endpoint(),
+            target([
+                ("board_id", json!(card.board_id.clone())),
+                ("stack_id", json!(card.stack_id.clone())),
+                ("card_id", json!(card.card_id.clone())),
+            ]),
+        ),
+    );
+    let (archived, deleted, confirmed) = action.output(false, true);
+    json_value(DeckCardRefOutput {
+        profile: profile.name.clone(),
+        server: profile.server.to_string(),
+        command: action.command().to_owned(),
+        board_id: card.board_id,
+        stack_id: card.stack_id,
+        card_id: card.card_id,
+        dry_run: false,
+        archived,
+        deleted,
+        confirmed,
     })
 }
 
@@ -2759,6 +3017,34 @@ struct DeckCardUpdateOutput {
     dry_run: bool,
     updated: bool,
     card: DeckCardWritePreview,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckCardMoveOutput {
+    profile: String,
+    server: String,
+    dry_run: bool,
+    moved: bool,
+    card_id: String,
+    board_id: String,
+    from_stack_id: String,
+    to_stack_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    order: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckCardRefOutput {
+    profile: String,
+    server: String,
+    command: String,
+    board_id: String,
+    stack_id: String,
+    card_id: String,
+    dry_run: bool,
+    archived: bool,
+    deleted: bool,
+    confirmed: bool,
 }
 
 #[derive(Debug, Serialize)]

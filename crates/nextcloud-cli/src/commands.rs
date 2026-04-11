@@ -606,6 +606,9 @@ pub struct DeckCardsArgs {
 pub enum DeckCardsCommand {
     Create(DeckCardCreateArgs),
     Update(DeckCardUpdateArgs),
+    Move(DeckCardMoveArgs),
+    Archive(DeckCardRefArgs),
+    Delete(DeckCardRefArgs),
 }
 
 #[derive(Debug, Args)]
@@ -656,6 +659,43 @@ pub struct DeckCardUpdateArgs {
 
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct DeckCardMoveArgs {
+    pub card_id: String,
+
+    #[arg(long)]
+    pub board: String,
+
+    #[arg(long)]
+    pub from_stack: String,
+
+    #[arg(long)]
+    pub to_stack: String,
+
+    #[arg(long)]
+    pub order: Option<i64>,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct DeckCardRefArgs {
+    pub card_id: String,
+
+    #[arg(long)]
+    pub board: String,
+
+    #[arg(long)]
+    pub stack: String,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub yes: bool,
 }
 
 #[derive(Debug, Subcommand)]

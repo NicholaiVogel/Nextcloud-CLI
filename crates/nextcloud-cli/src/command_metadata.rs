@@ -228,6 +228,21 @@ pub fn command_schema() -> CommandSchema {
                 "DeckCardUpdateResult",
             ),
             stable(
+                "deck cards move",
+                "Move a Deck card between stacks or reorder it, with dry-run support.",
+                "DeckCardMoveResult",
+            ),
+            stable(
+                "deck cards archive",
+                "Archive a Deck card with dry-run and confirmation.",
+                "DeckCardArchiveResult",
+            ),
+            stable(
+                "deck cards delete",
+                "Delete a Deck card with dry-run and confirmation.",
+                "DeckCardDeleteResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

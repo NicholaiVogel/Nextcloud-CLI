@@ -31,8 +31,9 @@ pub use config_schema::{
 };
 pub use contacts::{Contact, ContactCreateOptions, ContactSearchOptions, ContactsClient};
 pub use deck::{
-    DeckBoard, DeckBoardCreateOptions, DeckCard, DeckCardCreateOptions, DeckCardUpdateOptions,
-    DeckCardsOptions, DeckClient, DeckStack, DeckStackCreateOptions,
+    DeckBoard, DeckBoardCreateOptions, DeckCard, DeckCardCreateOptions, DeckCardMoveOptions,
+    DeckCardRefOptions, DeckCardUpdateOptions, DeckCardsOptions, DeckClient, DeckStack,
+    DeckStackCreateOptions,
 };
 pub use error::{Error, Result};
 pub use notes::{Note, NotesClient, NotesCreateOptions, NotesListOptions, NotesUpdateOptions};

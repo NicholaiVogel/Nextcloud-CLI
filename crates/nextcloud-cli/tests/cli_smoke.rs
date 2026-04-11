@@ -1570,6 +1570,129 @@ fn deck_card_update_dry_run_requires_fields_and_hides_description()
 }
 
 #[test]
+fn deck_card_move_dry_run_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "deck",
+            "cards",
+            "move",
+            "99",
+            "--board",
+            "10",
+            "--from-stack",
+            "4",
+            "--to-stack",
+            "5",
+            "--order",
+            "20",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"moved\": false"))
+        .stdout(predicate::str::contains("\"to_stack_id\": \"5\""));
+
+    Ok(())
+}
+
+#[test]
+fn deck_card_archive_and_delete_require_confirmation_and_support_dry_run()
+-> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    for command in ["archive", "delete"] {
+        Command::cargo_bin("nextcloud-cli")?
+            .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+            .args([
+                "--config-dir",
+                temp.path().to_str().expect("utf8 path"),
+                "--profile",
+                "personal",
+                "deck",
+                "cards",
+                command,
+                "99",
+                "--board",
+                "10",
+                "--stack",
+                "4",
+            ])
+            .assert()
+            .failure()
+            .code(2)
+            .stderr(predicate::str::contains("confirmation_required"));
+
+        Command::cargo_bin("nextcloud-cli")?
+            .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+            .args([
+                "--config-dir",
+                temp.path().to_str().expect("utf8 path"),
+                "--profile",
+                "personal",
+                "deck",
+                "cards",
+                command,
+                "99",
+                "--board",
+                "10",
+                "--stack",
+                "4",
+                "--dry-run",
+            ])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("\"confirmed\": false"));
+    }
+
+    Ok(())
+}
+
+#[test]
 fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
 

@@ -169,6 +169,53 @@ impl NextcloudClient {
         parse_json_response(response).await
     }
 
+    pub async fn request_json_with_ocs_header_no_response<B>(
+        &self,
+        method: Method,
+        path: &str,
+        body: &B,
+    ) -> Result<()>
+    where
+        B: Serialize + ?Sized,
+    {
+        let url = self.join(path)?;
+        let mut request = self
+            .http
+            .request(method, url)
+            .header("OCS-APIRequest", "true")
+            .json(body);
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+
+        let response = request.send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_else(|_| String::new());
+            return Err(Error::HttpStatus { status, body });
+        }
+        Ok(())
+    }
+
+    pub async fn request_empty_with_ocs_header(&self, method: Method, path: &str) -> Result<()> {
+        let url = self.join(path)?;
+        let mut request = self
+            .http
+            .request(method, url)
+            .header("OCS-APIRequest", "true");
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+
+        let response = request.send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_else(|_| String::new());
+            return Err(Error::HttpStatus { status, body });
+        }
+        Ok(())
+    }
+
     pub async fn delete_ocs_json<T>(&self, path: &str) -> Result<T>
     where
         T: DeserializeOwned,

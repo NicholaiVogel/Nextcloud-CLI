@@ -130,6 +130,43 @@ impl DeckClient {
         }
         Ok(card)
     }
+
+    pub async fn move_card(&self, options: &DeckCardMoveOptions) -> Result<()> {
+        let path = format!(
+            "index.php/apps/deck/api/v1.0/boards/{}/stacks/{}/cards/{}/reorder",
+            options.board_id, options.from_stack_id, options.card_id
+        );
+        self.client
+            .request_json_with_ocs_header_no_response(
+                Method::PUT,
+                &path,
+                &DeckCardMoveRequest {
+                    stack_id: options.to_stack_id.as_str(),
+                    order: options.order,
+                },
+            )
+            .await
+    }
+
+    pub async fn archive_card(&self, options: &DeckCardRefOptions) -> Result<()> {
+        let path = format!(
+            "index.php/apps/deck/api/v1.0/boards/{}/stacks/{}/cards/{}/archive",
+            options.board_id, options.stack_id, options.card_id
+        );
+        self.client
+            .request_empty_with_ocs_header(Method::PUT, &path)
+            .await
+    }
+
+    pub async fn delete_card(&self, options: &DeckCardRefOptions) -> Result<()> {
+        let path = format!(
+            "index.php/apps/deck/api/v1.0/boards/{}/stacks/{}/cards/{}",
+            options.board_id, options.stack_id, options.card_id
+        );
+        self.client
+            .request_empty_with_ocs_header(Method::DELETE, &path)
+            .await
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -211,6 +248,22 @@ pub struct DeckCardUpdateOptions {
     pub order: Option<i64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeckCardMoveOptions {
+    pub board_id: String,
+    pub from_stack_id: String,
+    pub to_stack_id: String,
+    pub card_id: String,
+    pub order: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeckCardRefOptions {
+    pub board_id: String,
+    pub stack_id: String,
+    pub card_id: String,
+}
+
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 struct RawDeckBoard {
     #[serde(flatten)]
@@ -267,6 +320,14 @@ struct DeckCardUpdateRequest<'a> {
     description: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     duedate: Option<&'a str>,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckCardMoveRequest<'a> {
+    #[serde(rename = "stackId")]
+    stack_id: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    order: Option<i64>,
 }
 
 impl From<RawDeckBoard> for DeckBoard {
@@ -567,5 +628,16 @@ mod tests {
         assert_eq!(value["title"], "Updated");
         assert_eq!(value["type"], "plain");
         assert!(value.get("description").is_none());
+    }
+
+    #[test]
+    fn serializes_card_move_request() {
+        let request = DeckCardMoveRequest {
+            stack_id: "5",
+            order: Some(20),
+        };
+        let value = serde_json::to_value(request).expect("serializes");
+        assert_eq!(value["stackId"], "5");
+        assert_eq!(value["order"], 20);
     }
 }
