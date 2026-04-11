@@ -1378,6 +1378,55 @@ fn deck_board_create_dry_run_is_wired() -> Result<(), Box<dyn std::error::Error>
 }
 
 #[test]
+fn deck_stack_create_dry_run_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "deck",
+            "stacks",
+            "create",
+            "--board",
+            "10",
+            "--title",
+            "Doing",
+            "--order",
+            "100",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"created\": false"))
+        .stdout(predicate::str::contains("\"board_id\": \"10\""));
+
+    Ok(())
+}
+
+#[test]
 fn deck_cards_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
     Command::cargo_bin("nextcloud-cli")?
         .args(["deck", "cards", "--help"])

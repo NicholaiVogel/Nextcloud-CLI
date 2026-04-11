@@ -539,6 +539,8 @@ pub struct NotesDeleteArgs {
 #[derive(Debug, Subcommand)]
 pub enum DeckCommand {
     Boards(DeckBoardsArgs),
+    #[command(subcommand)]
+    Stacks(DeckStacksCommand),
     Cards(DeckCardsArgs),
 }
 
@@ -563,6 +565,26 @@ pub struct DeckBoardCreateArgs {
 
     #[arg(long)]
     pub color: Option<String>,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DeckStacksCommand {
+    Create(DeckStackCreateArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct DeckStackCreateArgs {
+    #[arg(long)]
+    pub board: String,
+
+    #[arg(long)]
+    pub title: String,
+
+    #[arg(long)]
+    pub order: Option<i64>,
 
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,

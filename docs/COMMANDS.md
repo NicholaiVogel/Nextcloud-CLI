@@ -49,5 +49,6 @@ detection, core WebDAV file-transfer commands, and initial OCS share listing:
 - `notes delete <note-id> [--dry-run] [--yes]`
 - `deck boards [--details]`
 - `deck boards create --title <title> [--color <hex>] [--dry-run]`
+- `deck stacks create --board <id> --title <title> [--order <n>] [--dry-run]`
 - `deck cards --board <id> [--include-archived]`
 - `update check`

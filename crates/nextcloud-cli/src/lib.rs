@@ -1891,6 +1891,79 @@ async fn handle_deck(
                 count,
             })
         }
+        DeckCommand::Stacks(commands::DeckStacksCommand::Create(args)) => {
+            let stack = build_deck_stack_create_options(&args);
+            if args.dry_run {
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "deck.stacks.create",
+                        true,
+                        "POST",
+                        "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks",
+                        target([
+                            ("board_id", json!(stack.board_id.clone())),
+                            ("title", json!(stack.title.clone())),
+                            ("order", json!(stack.order)),
+                        ]),
+                    ),
+                );
+                return json_value(DeckStackCreateOutput {
+                    profile: profile.name,
+                    server: profile.server.to_string(),
+                    dry_run: true,
+                    created: false,
+                    stack: DeckStackCreatePreview {
+                        id: None,
+                        board_id: stack.board_id,
+                        title: stack.title,
+                        order: stack.order,
+                    },
+                });
+            }
+
+            let created = match deck.create_stack(&stack).await {
+                Ok(stack) => stack,
+                Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
+                    return Err(CliError::AppUnavailable {
+                        app: "deck".to_owned(),
+                        api_source: "deck".to_owned(),
+                    });
+                }
+                Err(error) => return Err(error.into()),
+            };
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "deck.stacks.create",
+                    false,
+                    "POST",
+                    "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks",
+                    target([
+                        ("board_id", json!(created.board_id.clone())),
+                        ("stack_id", json!(created.id.clone())),
+                        ("title", json!(created.title.clone())),
+                        ("order", json!(created.order)),
+                    ]),
+                ),
+            );
+            json_value(DeckStackCreateOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                dry_run: false,
+                created: true,
+                stack: DeckStackCreatePreview {
+                    id: Some(created.id),
+                    board_id: created.board_id,
+                    title: created.title.unwrap_or_default(),
+                    order: created.order,
+                },
+            })
+        }
         DeckCommand::Cards(args) => {
             let cards = match deck
                 .cards(&nextcloud::DeckCardsOptions {
@@ -1928,6 +2001,16 @@ fn build_deck_board_create_options(
         title: args.title.clone(),
         color: normalize_deck_color(args.color.as_deref().unwrap_or("0082c9"))?,
     })
+}
+
+fn build_deck_stack_create_options(
+    args: &commands::DeckStackCreateArgs,
+) -> nextcloud::DeckStackCreateOptions {
+    nextcloud::DeckStackCreateOptions {
+        board_id: args.board.clone(),
+        title: args.title.clone(),
+        order: args.order,
+    }
 }
 
 fn normalize_deck_color(value: &str) -> CliResult<String> {
@@ -2450,6 +2533,25 @@ struct DeckBoardCreatePreview {
     id: Option<String>,
     title: String,
     color: String,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckStackCreateOutput {
+    profile: String,
+    server: String,
+    dry_run: bool,
+    created: bool,
+    stack: DeckStackCreatePreview,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckStackCreatePreview {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    board_id: String,
+    title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    order: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]

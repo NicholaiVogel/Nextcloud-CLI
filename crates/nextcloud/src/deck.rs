@@ -40,6 +40,25 @@ impl DeckClient {
         Ok(DeckBoard::from(raw))
     }
 
+    pub async fn create_stack(&self, options: &DeckStackCreateOptions) -> Result<DeckStack> {
+        let path = format!(
+            "index.php/apps/deck/api/v1.0/boards/{}/stacks",
+            options.board_id
+        );
+        let raw: RawDeckStack = self
+            .client
+            .request_json_with_ocs_header(
+                Method::POST,
+                &path,
+                &DeckStackCreateRequest {
+                    title: options.title.as_str(),
+                    order: options.order,
+                },
+            )
+            .await?;
+        Ok(DeckStack::from(raw))
+    }
+
     pub async fn cards(&self, options: &DeckCardsOptions) -> Result<Vec<DeckCard>> {
         let path = format!(
             "index.php/apps/deck/api/v1.0/boards/{}/stacks",
@@ -78,6 +97,24 @@ pub struct DeckBoard {
 pub struct DeckBoardCreateOptions {
     pub title: String,
     pub color: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DeckStack {
+    pub id: String,
+    pub board_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<i64>,
+    pub deleted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeckStackCreateOptions {
+    pub board_id: String,
+    pub title: String,
+    pub order: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,6 +162,13 @@ struct DeckBoardCreateRequest<'a> {
     color: &'a str,
 }
 
+#[derive(Debug, Serialize)]
+struct DeckStackCreateRequest<'a> {
+    title: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    order: Option<i64>,
+}
+
 impl From<RawDeckBoard> for DeckBoard {
     fn from(raw: RawDeckBoard) -> Self {
         Self {
@@ -137,6 +181,22 @@ impl From<RawDeckBoard> for DeckBoard {
             color: raw.string("color").and_then(non_empty),
             archived: raw.bool("archived").unwrap_or(false),
             deleted: raw.bool("deleted").unwrap_or(false),
+        }
+    }
+}
+
+impl From<RawDeckStack> for DeckStack {
+    fn from(raw: RawDeckStack) -> Self {
+        let deleted_at = raw.i64("deletedAt").or_else(|| raw.i64("deleted_at"));
+        Self {
+            id: raw.string("id").unwrap_or_default(),
+            board_id: raw
+                .string("boardId")
+                .or_else(|| raw.string("board_id"))
+                .unwrap_or_default(),
+            title: raw.string("title").and_then(non_empty),
+            order: raw.i64("order"),
+            deleted: raw.bool("deleted").unwrap_or(false) || deleted_at.unwrap_or(0) != 0,
         }
     }
 }
@@ -176,6 +236,14 @@ impl RawDeckStack {
 
     fn string(&self, key: &str) -> Option<String> {
         value_to_string(self.value(key)?)
+    }
+
+    fn i64(&self, key: &str) -> Option<i64> {
+        value_to_i64(self.value(key)?)
+    }
+
+    fn bool(&self, key: &str) -> Option<bool> {
+        value_to_bool(self.value(key)?)
     }
 
     fn cards(&self) -> Vec<RawDeckCard> {
@@ -241,6 +309,15 @@ fn value_to_bool(value: &Value) -> Option<bool> {
             "false" | "0" | "" => Some(false),
             _ => None,
         },
+        Value::Null | Value::Array(_) | Value::Object(_) => None,
+    }
+}
+
+fn value_to_i64(value: &Value) -> Option<i64> {
+    match value {
+        Value::Number(value) => value.as_i64().or_else(|| value.as_u64().map(|n| n as i64)),
+        Value::String(value) => value.parse().ok(),
+        Value::Bool(value) => Some(i64::from(*value)),
         Value::Null | Value::Array(_) | Value::Object(_) => None,
     }
 }
@@ -330,5 +407,33 @@ mod tests {
         let value = serde_json::to_value(request).expect("serializes");
         assert_eq!(value["title"], "Roadmap");
         assert_eq!(value["color"], "0082c9");
+    }
+
+    #[test]
+    fn normalizes_stack() {
+        let raw = r#"{
+            "id": 4,
+            "boardId": 2,
+            "title": "Doing",
+            "order": 999,
+            "deletedAt": 0
+        }"#;
+        let stack = DeckStack::from(serde_json::from_str::<RawDeckStack>(raw).expect("stack"));
+        assert_eq!(stack.id, "4");
+        assert_eq!(stack.board_id, "2");
+        assert_eq!(stack.title.as_deref(), Some("Doing"));
+        assert_eq!(stack.order, Some(999));
+        assert!(!stack.deleted);
+    }
+
+    #[test]
+    fn serializes_stack_create_request() {
+        let request = DeckStackCreateRequest {
+            title: "Doing",
+            order: Some(100),
+        };
+        let value = serde_json::to_value(request).expect("serializes");
+        assert_eq!(value["title"], "Doing");
+        assert_eq!(value["order"], 100);
     }
 }

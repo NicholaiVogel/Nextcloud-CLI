@@ -208,6 +208,11 @@ pub fn command_schema() -> CommandSchema {
                 "DeckBoardCreateResult",
             ),
             stable(
+                "deck stacks create",
+                "Create a Deck stack on an existing board, with dry-run support.",
+                "DeckStackCreateResult",
+            ),
+            stable(
                 "deck cards",
                 "List cards for a Deck board by flattening stack card arrays.",
                 "DeckCardsResult",

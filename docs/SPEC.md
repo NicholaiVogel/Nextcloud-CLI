@@ -2127,7 +2127,8 @@ Behavior:
 - Support `--dry-run` for every write command.
 - Prefer archive over hard delete where the server exposes both semantics.
 - Status: `deck boards create --title <title> [--color <hex>] [--dry-run]`
-  is implemented. Stack and card write commands remain planned.
+  and `deck stacks create --board <id> --title <title> [--order <n>]
+  [--dry-run]` are implemented. Card write commands remain planned.
 
 Completion gate:
 
@@ -5342,7 +5343,8 @@ Deliverables:
 - Notes read/write commands: `notes list`, `notes create`, `notes update`, and
   `notes delete` implemented
 - Deck board, stack, and card commands: `deck boards`, `deck boards create`,
-  and `deck cards` implemented for board/card read plus board creation
+  `deck stacks create`, and `deck cards` implemented for board/card read plus
+  board/stack creation
 - Activity feed command: implemented for `activity recent --limit <n>`
 - optional app unavailable mapping
 - smoke report fields for enabled and unavailable apps
@@ -5356,6 +5358,7 @@ nextcloud-cli notes update 1 --title "Smoke" --dry-run --format json
 nextcloud-cli notes delete 1 --dry-run --format json
 nextcloud-cli deck boards --format json
 nextcloud-cli deck boards create --title "Smoke" --dry-run --format json
+nextcloud-cli deck stacks create --board 1 --title "Doing" --dry-run --format json
 nextcloud-cli deck cards --board 1 --format json
 nextcloud-cli activity recent --limit 20 --format json
 ```
