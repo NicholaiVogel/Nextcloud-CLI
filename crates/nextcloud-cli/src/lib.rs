@@ -1,3 +1,4 @@
+mod audit;
 mod capability_cache;
 mod command_metadata;
 mod commands;
@@ -15,6 +16,7 @@ use std::time::Duration;
 use tokio::time::{Instant, sleep};
 use zeroize::Zeroizing;
 
+use audit::{command_executed, record, remote_path_target, share_id_target, target};
 use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
     AuthAppPasswordArgs, AuthCommand, Cli, Command, CommandsCommand, ConfigCommand, FilesCommand,
@@ -172,7 +174,26 @@ fn handle_profiles(command: ProfilesCommand, store: &ConfigStore) -> CliResult<V
         ProfilesCommand::SetDefault(args) => {
             let mut config = store.load()?;
             config.set_default_profile(&args.name)?;
+            let profile = config
+                .profiles
+                .get(&args.name)
+                .ok_or_else(|| nextcloud::Error::ProfileNotFound {
+                    name: args.name.clone(),
+                })?
+                .clone();
             store.save(&config)?;
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "profiles.set-default",
+                    false,
+                    "CONFIG",
+                    store.paths().config_file.to_string_lossy().as_ref(),
+                    target([("default_profile", json!(args.name))]),
+                ),
+            );
             json_value(json!({
                 "default_profile": args.name,
                 "updated": true,
@@ -220,6 +241,18 @@ fn handle_profile_policy(
                 changed,
             };
             store.save(&config)?;
+            record(
+                store.paths(),
+                &command_executed(
+                    &output.profile,
+                    &output.server,
+                    "profiles.policy.set",
+                    false,
+                    "CONFIG",
+                    store.paths().config_file.to_string_lossy().as_ref(),
+                    target([("changed", json!(output.changed))]),
+                ),
+            );
             json_value(output)
         }
         commands::ProfilePolicyCommand::Reset(args) => {
@@ -243,6 +276,18 @@ fn handle_profile_policy(
                 reset: true,
             };
             store.save(&config)?;
+            record(
+                store.paths(),
+                &command_executed(
+                    &output.profile,
+                    &output.server,
+                    "profiles.policy.reset",
+                    false,
+                    "CONFIG",
+                    store.paths().config_file.to_string_lossy().as_ref(),
+                    target([("reset", json!(true))]),
+                ),
+            );
             json_value(output)
         }
     }
@@ -521,6 +566,23 @@ async fn handle_shares(
             let password_protected = args.password.is_some();
 
             if args.dry_run {
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "shares.create",
+                        true,
+                        "POST",
+                        "/ocs/v2.php/apps/files_sharing/api/v1/shares",
+                        target([
+                            ("remote_path", json!(path)),
+                            ("public", json!(true)),
+                            ("password_protected", json!(password_protected)),
+                            ("expiration", json!(expire_date)),
+                        ]),
+                    ),
+                );
                 return json_value(json!({
                     "profile": profile.name,
                     "server": profile.server.to_string(),
@@ -559,6 +621,24 @@ async fn handle_shares(
                     permissions: 1,
                 })
                 .await?;
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "shares.create",
+                    false,
+                    "POST",
+                    "/ocs/v2.php/apps/files_sharing/api/v1/shares",
+                    target([
+                        ("remote_path", json!(path)),
+                        ("share_id", json!(share.id)),
+                        ("public", json!(true)),
+                        ("password_protected", json!(password_protected)),
+                        ("expiration", json!(expire_date)),
+                    ]),
+                ),
+            );
 
             json_value(json!({
                 "profile": profile.name,
@@ -577,6 +657,7 @@ async fn handle_shares(
                 "shares delete",
                 &profile,
                 &shares_client,
+                store,
             )
             .await
         }
@@ -588,6 +669,7 @@ async fn handle_shares(
                 "shares revoke",
                 &profile,
                 &shares_client,
+                store,
             )
             .await
         }
@@ -601,9 +683,23 @@ async fn handle_share_delete(
     command: &str,
     profile: &Profile,
     shares_client: &SharesClient,
+    store: &ConfigStore,
 ) -> CliResult<Value> {
     let share_id = validate_share_id(&share_id)?;
+    let command_key = command.replace(' ', ".");
     if dry_run {
+        record(
+            store.paths(),
+            &command_executed(
+                &profile.name,
+                profile.server.as_str(),
+                &command_key,
+                true,
+                "DELETE",
+                "/ocs/v2.php/apps/files_sharing/api/v1/shares/{share-id}",
+                share_id_target(&share_id),
+            ),
+        );
         return json_value(ShareDeleteOutput {
             profile: profile.name.clone(),
             server: profile.server.to_string(),
@@ -622,6 +718,18 @@ async fn handle_share_delete(
     }
 
     shares_client.delete(&share_id).await?;
+    record(
+        store.paths(),
+        &command_executed(
+            &profile.name,
+            profile.server.as_str(),
+            &command_key,
+            false,
+            "DELETE",
+            "/ocs/v2.php/apps/files_sharing/api/v1/shares/{share-id}",
+            share_id_target(&share_id),
+        ),
+    );
     json_value(ShareDeleteOutput {
         profile: profile.name.clone(),
         server: profile.server.to_string(),
@@ -711,6 +819,18 @@ async fn handle_files(
                 webdav.mkdir(&normalized).await?;
                 vec![normalized.clone()]
             };
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile_name,
+                    &server,
+                    "files.mkdir",
+                    args.dry_run,
+                    "MKCOL",
+                    "/remote.php/dav/files/{username}{remote-path}",
+                    remote_path_target(&normalized),
+                ),
+            );
             json_value(json!({
                 "path": normalized,
                 "dry_run": args.dry_run,
@@ -744,6 +864,21 @@ async fn handle_files(
                 }
                 entry
             });
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile_name,
+                    &server,
+                    "files.upload",
+                    false,
+                    "PUT",
+                    "/remote.php/dav/files/{username}{remote-path}",
+                    target([
+                        ("remote_path", json!(remote)),
+                        ("bytes", json!(bytes_uploaded)),
+                    ]),
+                ),
+            );
 
             json_value(FilesUploadOutput {
                 profile: profile_name,
@@ -805,6 +940,21 @@ async fn handle_files(
                     source,
                 }
             })?;
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile_name,
+                    &server,
+                    "files.download",
+                    false,
+                    "GET",
+                    "/remote.php/dav/files/{username}{remote-path}",
+                    target([
+                        ("remote_path", json!(remote)),
+                        ("bytes", json!(download.bytes_written)),
+                    ]),
+                ),
+            );
 
             json_value(FilesDownloadOutput {
                 profile: profile_name,
@@ -826,6 +976,18 @@ async fn handle_files(
             if !args.dry_run {
                 webdav.delete(&path).await?;
             }
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile_name,
+                    &server,
+                    "files.delete",
+                    args.dry_run,
+                    "DELETE",
+                    "/remote.php/dav/files/{username}{remote-path}",
+                    remote_path_target(&path),
+                ),
+            );
 
             json_value(FilesDeleteOutput {
                 profile: profile_name,

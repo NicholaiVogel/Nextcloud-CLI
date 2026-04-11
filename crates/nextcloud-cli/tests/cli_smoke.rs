@@ -295,6 +295,59 @@ fn shares_create_public_dry_run_does_not_print_password() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn audit_log_records_write_dry_run_without_secret() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+    let config_dir = temp.path().join("config").display().to_string();
+    let audit_log = temp.path().join("audit.jsonl");
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            &config_dir,
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .env("NEXTCLOUD_CLI_LOG_FILE", &audit_log)
+        .args([
+            "--config-dir",
+            &config_dir,
+            "--profile",
+            "personal",
+            "shares",
+            "create",
+            "/Documents/report.pdf",
+            "--public",
+            "--password",
+            "share-password",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("share-password").not());
+
+    let raw = std::fs::read_to_string(audit_log)?;
+    assert!(raw.contains("\"command\":\"shares.create\""));
+    assert!(raw.contains("\"dry_run\":true"));
+    assert!(!raw.contains("share-password"));
+
+    Ok(())
+}
+
+#[test]
 fn shares_create_public_requires_confirmation_before_policy()
 -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;

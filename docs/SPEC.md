@@ -3320,6 +3320,9 @@ Default behavior:
 - no persistent request log unless enabled
 - stderr diagnostics for current command
 - optional JSONL log file when `NEXTCLOUD_CLI_LOG_FILE` is set or config enables it
+- Status: implemented for write-command audit events when
+  `NEXTCLOUD_CLI_LOG_FILE` is set, or when `NEXTCLOUD_CLI_AUDIT=1` writes daily
+  JSONL files under the configured audit directory.
 
 Suggested log path when enabled:
 
@@ -3393,11 +3396,13 @@ and environment variables, but the product should reserve the namespace.
 Audit logging is complete only when:
 
 - logging is structured JSONL when enabled
-- secrets are redacted by tests
-- write commands produce audit events
-- dry-run commands are marked as dry-run
-- users can find the log path
-- logs never corrupt stdout command JSON
+- secrets are redacted by tests: implemented for audit targets
+- write commands produce audit events: implemented for the current file, share,
+  and profile policy write surfaces
+- dry-run commands are marked as dry-run: implemented
+- users can find the log path: implemented through `config path`
+- logs never corrupt stdout command JSON: implemented by writing audit warnings
+  to stderr only
 
 ## 27. Machine-readable Command Metadata Spec
 
@@ -5264,7 +5269,7 @@ Deliverables:
 - destructive action confirmation model
 - first version of per-profile policy enforcement: implemented for public share
   creation, with policy show/set/reset commands
-- audit event shape for writes
+- secret-redacted JSONL audit events for writes: implemented
 
 Completion signal:
 

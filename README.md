@@ -361,6 +361,8 @@ Implemented environment variables:
 | `NEXTCLOUD_CLI_CONFIG_DIR` | Override the config directory. |
 | `NEXTCLOUD_CLI_KEYRING_BACKEND` | `keyring`, `file`, or unset for automatic keyring with local-file fallback. |
 | `NEXTCLOUD_APP_PASSWORD` | Consumed by `auth add --app-password`. |
+| `NEXTCLOUD_CLI_LOG_FILE` | Append secret-redacted JSONL audit events for write commands to this file. |
+| `NEXTCLOUD_CLI_AUDIT` | Set to `1` or `true` to write daily JSONL audit logs under the CLI audit directory. |
 
 `auth app-password --password-env <NAME>` can read the account password from
 any environment variable name you provide.
@@ -489,7 +491,7 @@ Current Phase 3 work is sharing and safety policy:
 - share revoke/delete with dry-run support and explicit confirmation,
   implemented
 - per-profile policy enforcement
-- audit event shape for writes
+- secret-redacted JSONL audit events for write commands, implemented
 
 Later phases cover calendar, contacts, Notes, Deck, Activity, raw DAV/OCS
 commands, release binaries, npm, a curl installer, Homebrew, and agent skills.
