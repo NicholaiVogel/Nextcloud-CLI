@@ -30,6 +30,12 @@ pub enum Error {
         source: std::io::Error,
     },
 
+    #[error("failed to write response body: {source}")]
+    WriteResponse {
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("failed to parse JSON from {path}: {source}")]
     ParseJson {
         path: PathBuf,
@@ -74,6 +80,9 @@ pub enum Error {
         status: reqwest::StatusCode,
         body: String,
     },
+
+    #[error("download byte count mismatch: expected {expected} bytes, wrote {actual} bytes")]
+    DownloadSizeMismatch { expected: u64, actual: u64 },
 }
 
 impl Error {
@@ -83,6 +92,7 @@ impl Error {
             Self::CreateDir { .. } => "create_dir_failed",
             Self::ReadFile { .. } => "read_file_failed",
             Self::WriteFile { .. } => "write_file_failed",
+            Self::WriteResponse { .. } => "write_response_failed",
             Self::ParseJson { .. } => "parse_json_failed",
             Self::ParseXml { .. } => "parse_xml_failed",
             Self::SerializeJson { .. } => "serialize_json_failed",
@@ -93,6 +103,7 @@ impl Error {
             Self::InvalidRemotePath { .. } => "invalid_remote_path",
             Self::Http(_) => "http_request_failed",
             Self::HttpStatus { .. } => "http_status_failed",
+            Self::DownloadSizeMismatch { .. } => "download_size_mismatch",
         }
     }
 }

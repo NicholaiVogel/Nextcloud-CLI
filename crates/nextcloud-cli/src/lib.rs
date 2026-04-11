@@ -468,15 +468,51 @@ async fn handle_files(
         FilesCommand::Download(args) => {
             let remote = nextcloud::webdav::normalize_remote_path(&args.remote)?;
             let local = args.local;
-            if local.exists() && !args.overwrite {
+            let existed_before = local.exists();
+            if existed_before && !args.overwrite {
                 return Err(CliError::LocalFileExists { path: local });
             }
 
-            let bytes = webdav.download(&remote).await?;
-            let bytes_written = bytes.len() as u64;
-            fs::write(&local, bytes).map_err(|source| nextcloud::Error::WriteFile {
-                path: local.clone(),
-                source,
+            let partial = partial_download_path(&local);
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&partial)
+                .map_err(|source| nextcloud::Error::WriteFile {
+                    path: partial.clone(),
+                    source,
+                })?;
+
+            let download = match webdav.download_to_writer(&remote, &mut file).await {
+                Ok(download) => download,
+                Err(error) => {
+                    let _ = fs::remove_file(&partial);
+                    return Err(error.into());
+                }
+            };
+
+            if let Err(source) = file.sync_all() {
+                drop(file);
+                let _ = fs::remove_file(&partial);
+                return Err(nextcloud::Error::WriteFile {
+                    path: partial.clone(),
+                    source,
+                }
+                .into());
+            }
+            drop(file);
+
+            if !args.overwrite && local.exists() {
+                let _ = fs::remove_file(&partial);
+                return Err(CliError::LocalFileExists { path: local });
+            }
+
+            fs::rename(&partial, &local).map_err(|source| {
+                let _ = fs::remove_file(&partial);
+                nextcloud::Error::WriteFile {
+                    path: local.clone(),
+                    source,
+                }
             })?;
 
             json_value(FilesDownloadOutput {
@@ -484,8 +520,9 @@ async fn handle_files(
                 server,
                 remote,
                 local: local.display().to_string(),
-                bytes_written,
-                overwritten: args.overwrite,
+                bytes_written: download.bytes_written,
+                content_length: download.content_length,
+                overwritten: args.overwrite && existed_before,
             })
         }
         FilesCommand::Delete(args) => {
@@ -523,6 +560,20 @@ fn ensure_upload_file(path: &Path) -> CliResult<()> {
         });
     }
     Ok(())
+}
+
+fn partial_download_path(path: &Path) -> std::path::PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("download");
+    let timestamp = Utc::now().timestamp_nanos_opt().unwrap_or_default();
+    path.with_file_name(format!(
+        ".{file_name}.{}.{}.part",
+        std::process::id(),
+        timestamp
+    ))
 }
 
 async fn handle_server(
@@ -722,6 +773,7 @@ struct FilesDownloadOutput {
     remote: String,
     local: String,
     bytes_written: u64,
+    content_length: Option<u64>,
     overwritten: bool,
 }
 

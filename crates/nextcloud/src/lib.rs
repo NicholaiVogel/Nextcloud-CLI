@@ -16,7 +16,7 @@ pub use auth::{
     LoginFlowV2Poll, LoginFlowV2Start,
 };
 pub use capabilities::{CapabilitiesClient, ServerCapabilities, ServerStatus};
-pub use client::{ClientAuth, NextcloudClient};
+pub use client::{ClientAuth, DownloadedBytes, NextcloudClient};
 pub use config_schema::{
     CliConfig, ConfigPaths, ConfigStore, CredentialRef, Profile, ProfilePolicy,
 };

@@ -3,8 +3,9 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 
-use crate::client::NextcloudClient;
+use crate::client::{DownloadedBytes, NextcloudClient};
 use crate::error::{Error, Result};
 
 #[derive(Debug, Clone)]
@@ -99,6 +100,20 @@ impl WebDavClient {
     pub async fn download(&self, remote_path: &str) -> Result<Vec<u8>> {
         let dav_path = self.dav_path(remote_path)?;
         self.client.request_bytes(Method::GET, &dav_path).await
+    }
+
+    pub async fn download_to_writer<W>(
+        &self,
+        remote_path: &str,
+        writer: &mut W,
+    ) -> Result<DownloadedBytes>
+    where
+        W: Write,
+    {
+        let dav_path = self.dav_path(remote_path)?;
+        self.client
+            .request_to_writer(Method::GET, &dav_path, writer)
+            .await
     }
 
     pub async fn delete(&self, remote_path: &str) -> Result<()> {
@@ -493,6 +508,12 @@ fn local_name(name: &[u8]) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+    use std::io::Read;
+    use std::net::{TcpListener, TcpStream};
+    use std::thread;
+    use std::time::Duration;
+    use url::Url;
 
     #[test]
     fn parses_basic_multistatus() -> Result<()> {
@@ -590,5 +611,368 @@ mod tests {
         assert!(body.contains("<d:literal>%hello #1%</d:literal>"));
         assert!(body.contains("<d:nresults>25</d:nresults>"));
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn list_sends_propfind_and_filters_base_entry() -> Result<()> {
+        let server = OneShotServer::spawn(MockResponse::xml(
+            207,
+            r#"<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+  <d:response>
+    <d:href>/remote.php/dav/files/nicholai/Documents/</d:href>
+    <d:propstat><d:prop><d:resourcetype><d:collection /></d:resourcetype></d:prop></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/nicholai/Documents/report.md</d:href>
+    <d:propstat><d:prop>
+      <d:getcontentlength>42</d:getcontentlength>
+      <d:getcontenttype>text/markdown</d:getcontenttype>
+      <d:getetag>"abc"</d:getetag>
+    </d:prop></d:propstat>
+  </d:response>
+</d:multistatus>"#,
+        ));
+
+        let entries = mock_webdav(server.base_url())?.list("/Documents").await?;
+        let request = server.join();
+
+        assert_eq!(request.method, "PROPFIND");
+        assert_eq!(request.path, "/remote.php/dav/files/nicholai/Documents");
+        assert_eq!(request.header("depth"), Some("1"));
+        assert!(request.header("authorization").is_some());
+        assert!(request.body.contains("<d:propfind"));
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].path, "/Documents/report.md");
+        assert_eq!(entries[0].size, Some(42));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn stat_sends_depth_zero_propfind() -> Result<()> {
+        let server = OneShotServer::spawn(MockResponse::xml(
+            207,
+            r#"<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+  <d:response>
+    <d:href>/remote.php/dav/files/nicholai/Documents/report.md</d:href>
+    <d:propstat><d:prop>
+      <d:getcontentlength>42</d:getcontentlength>
+      <d:getcontenttype>text/markdown</d:getcontenttype>
+    </d:prop></d:propstat>
+  </d:response>
+</d:multistatus>"#,
+        ));
+
+        let entry = mock_webdav(server.base_url())?
+            .stat("/Documents/report.md")
+            .await?;
+        let request = server.join();
+
+        assert_eq!(request.method, "PROPFIND");
+        assert_eq!(
+            request.path,
+            "/remote.php/dav/files/nicholai/Documents/report.md"
+        );
+        assert_eq!(request.header("depth"), Some("0"));
+        assert!(request.header("authorization").is_some());
+        assert_eq!(
+            entry.map(|entry| entry.path),
+            Some("/Documents/report.md".to_owned())
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn mkdir_maps_webdav_failure_status() -> Result<()> {
+        let server = OneShotServer::spawn(MockResponse::text(409, "Conflict"));
+
+        let error = mock_webdav(server.base_url())?
+            .mkdir("/Documents/existing-parent/new")
+            .await
+            .expect_err("MKCOL should fail");
+        let request = server.join();
+
+        assert_eq!(request.method, "MKCOL");
+        assert_eq!(
+            request.path,
+            "/remote.php/dav/files/nicholai/Documents/existing-parent/new"
+        );
+        assert!(request.header("authorization").is_some());
+        match error {
+            Error::HttpStatus { status, body } => {
+                assert_eq!(status, StatusCode::CONFLICT);
+                assert_eq!(body, "Conflict");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn search_sends_dav_search_xml() -> Result<()> {
+        let server = OneShotServer::spawn(MockResponse::xml(
+            207,
+            r#"<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+  <d:response>
+    <d:href>/files/nicholai/Documents/report.md</d:href>
+    <d:propstat><d:prop><d:getcontentlength>42</d:getcontentlength></d:prop></d:propstat>
+  </d:response>
+</d:multistatus>"#,
+        ));
+
+        let entries = mock_webdav(server.base_url())?
+            .search("report", "/Documents", 10)
+            .await?;
+        let request = server.join();
+
+        assert_eq!(request.method, "SEARCH");
+        assert_eq!(request.path, "/remote.php/dav");
+        assert_eq!(
+            request.header("content-type"),
+            Some("application/xml; charset=utf-8")
+        );
+        assert!(request.header("authorization").is_some());
+        assert!(
+            request
+                .body
+                .contains("<d:href>/files/nicholai/Documents</d:href>")
+        );
+        assert!(request.body.contains("<d:literal>%report%</d:literal>"));
+        assert!(request.body.contains("<d:nresults>10</d:nresults>"));
+        assert_eq!(entries[0].path, "/Documents/report.md");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn upload_sends_put_body_and_returns_etag() -> Result<()> {
+        let server = OneShotServer::spawn(
+            MockResponse::text(201, "").with_header("etag", r#""etag-value""#),
+        );
+
+        let etag = mock_webdav(server.base_url())?
+            .upload(
+                "/Documents/report.md",
+                b"hello".to_vec(),
+                Some("text/markdown"),
+            )
+            .await?;
+        let request = server.join();
+
+        assert_eq!(request.method, "PUT");
+        assert_eq!(
+            request.path,
+            "/remote.php/dav/files/nicholai/Documents/report.md"
+        );
+        assert_eq!(request.header("content-type"), Some("text/markdown"));
+        assert!(request.header("authorization").is_some());
+        assert_eq!(request.body, "hello");
+        assert_eq!(etag.as_deref(), Some("etag-value"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn download_streams_response_to_writer() -> Result<()> {
+        let server = OneShotServer::spawn(MockResponse::text(200, "hello"));
+
+        let mut output = Vec::new();
+        let downloaded = mock_webdav(server.base_url())?
+            .download_to_writer("/Documents/report.md", &mut output)
+            .await?;
+        let request = server.join();
+
+        assert_eq!(request.method, "GET");
+        assert_eq!(
+            request.path,
+            "/remote.php/dav/files/nicholai/Documents/report.md"
+        );
+        assert!(request.header("authorization").is_some());
+        assert_eq!(output, b"hello");
+        assert_eq!(downloaded.bytes_written, 5);
+        assert_eq!(downloaded.content_length, Some(5));
+        Ok(())
+    }
+
+    fn mock_webdav(base_url: &str) -> Result<WebDavClient> {
+        let base = Url::parse(base_url).expect("valid mock URL");
+        let client = NextcloudClient::new(
+            base,
+            Some(crate::ClientAuth {
+                username: "nicholai".to_owned(),
+                app_password: "app-secret".to_owned(),
+            }),
+        )?;
+        Ok(WebDavClient::new(client, "nicholai".to_owned()))
+    }
+
+    #[derive(Debug)]
+    struct RecordedRequest {
+        method: String,
+        path: String,
+        headers: HashMap<String, String>,
+        body: String,
+    }
+
+    impl RecordedRequest {
+        fn header(&self, name: &str) -> Option<&str> {
+            self.headers
+                .get(&name.to_ascii_lowercase())
+                .map(String::as_str)
+        }
+    }
+
+    struct MockResponse {
+        status: u16,
+        content_type: &'static str,
+        headers: Vec<(&'static str, &'static str)>,
+        body: &'static str,
+    }
+
+    impl MockResponse {
+        fn text(status: u16, body: &'static str) -> Self {
+            Self {
+                status,
+                content_type: "text/plain",
+                headers: Vec::new(),
+                body,
+            }
+        }
+
+        fn xml(status: u16, body: &'static str) -> Self {
+            Self {
+                status,
+                content_type: "application/xml; charset=utf-8",
+                headers: Vec::new(),
+                body,
+            }
+        }
+
+        fn with_header(mut self, name: &'static str, value: &'static str) -> Self {
+            self.headers.push((name, value));
+            self
+        }
+    }
+
+    struct OneShotServer {
+        base_url: String,
+        handle: thread::JoinHandle<RecordedRequest>,
+    }
+
+    impl OneShotServer {
+        fn spawn(response: MockResponse) -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+            let address = listener.local_addr().expect("read test server address");
+            let handle = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().expect("accept one request");
+                let request = read_request(&mut stream);
+                write_response(&mut stream, response);
+                request
+            });
+
+            Self {
+                base_url: format!("http://{address}/"),
+                handle,
+            }
+        }
+
+        fn base_url(&self) -> &str {
+            &self.base_url
+        }
+
+        fn join(self) -> RecordedRequest {
+            self.handle.join().expect("mock server thread")
+        }
+    }
+
+    fn read_request(stream: &mut TcpStream) -> RecordedRequest {
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("set read timeout");
+
+        let mut buffer = Vec::new();
+        let mut header_end = None;
+        let mut content_length = 0_usize;
+
+        loop {
+            let mut chunk = [0_u8; 1024];
+            let read = stream.read(&mut chunk).expect("read request");
+            assert!(read != 0, "connection closed before request completed");
+            buffer.extend_from_slice(&chunk[..read]);
+
+            if header_end.is_none()
+                && let Some(position) = find_header_end(&buffer)
+            {
+                header_end = Some(position);
+                let headers = String::from_utf8_lossy(&buffer[..position]);
+                content_length = parse_content_length(&headers);
+            }
+
+            if let Some(position) = header_end
+                && buffer.len() >= position + 4 + content_length
+            {
+                break;
+            }
+        }
+
+        let header_end = header_end.expect("request headers");
+        let headers_text = String::from_utf8_lossy(&buffer[..header_end]);
+        let mut lines = headers_text.lines();
+        let request_line = lines.next().expect("request line");
+        let mut request_parts = request_line.split_whitespace();
+        let method = request_parts.next().expect("method").to_owned();
+        let path = request_parts.next().expect("path").to_owned();
+        let mut headers = HashMap::new();
+        for line in lines {
+            if let Some((name, value)) = line.split_once(':') {
+                headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_owned());
+            }
+        }
+
+        let body_start = header_end + 4;
+        let body_end = body_start + content_length;
+        let body = String::from_utf8_lossy(&buffer[body_start..body_end]).into_owned();
+
+        RecordedRequest {
+            method,
+            path,
+            headers,
+            body,
+        }
+    }
+
+    fn write_response(stream: &mut TcpStream, response: MockResponse) {
+        let mut headers = format!(
+            "HTTP/1.1 {} OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n",
+            response.status,
+            response.content_type,
+            response.body.len()
+        );
+        for (name, value) in response.headers {
+            headers.push_str(name);
+            headers.push_str(": ");
+            headers.push_str(value);
+            headers.push_str("\r\n");
+        }
+        headers.push_str("\r\n");
+        stream
+            .write_all(headers.as_bytes())
+            .expect("write response headers");
+        stream
+            .write_all(response.body.as_bytes())
+            .expect("write response body");
+    }
+
+    fn find_header_end(buffer: &[u8]) -> Option<usize> {
+        buffer.windows(4).position(|window| window == b"\r\n\r\n")
+    }
+
+    fn parse_content_length(headers: &str) -> usize {
+        headers
+            .lines()
+            .filter_map(|line| line.split_once(':'))
+            .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+            .and_then(|(_, value)| value.trim().parse().ok())
+            .unwrap_or(0)
     }
 }

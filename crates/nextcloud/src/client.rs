@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::time::Duration;
 
 use reqwest::Method;
@@ -8,6 +9,12 @@ use url::Url;
 
 use crate::config_schema::Profile;
 use crate::error::{Error, Result};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DownloadedBytes {
+    pub bytes_written: u64,
+    pub content_length: Option<u64>,
+}
 
 #[derive(Debug, Clone)]
 pub struct ClientAuth {
@@ -33,7 +40,7 @@ impl NextcloudClient {
 
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(60))
+            .read_timeout(Duration::from_secs(60))
             .default_headers(default_headers)
             .build()?;
 
@@ -179,6 +186,52 @@ impl NextcloudClient {
         }
 
         Ok(response.bytes().await?.to_vec())
+    }
+
+    pub async fn request_to_writer<W>(
+        &self,
+        method: Method,
+        path: &str,
+        writer: &mut W,
+    ) -> Result<DownloadedBytes>
+    where
+        W: Write,
+    {
+        let url = self.join(path)?;
+        let mut request = self.http.request(method, url);
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+
+        let mut response = request.send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_else(|_| String::new());
+            return Err(Error::HttpStatus { status, body });
+        }
+
+        let content_length = response.content_length();
+        let mut bytes_written = 0_u64;
+        while let Some(chunk) = response.chunk().await? {
+            writer
+                .write_all(&chunk)
+                .map_err(|source| Error::WriteResponse { source })?;
+            bytes_written += chunk.len() as u64;
+        }
+
+        if let Some(expected) = content_length
+            && expected != bytes_written
+        {
+            return Err(Error::DownloadSizeMismatch {
+                expected,
+                actual: bytes_written,
+            });
+        }
+
+        Ok(DownloadedBytes {
+            bytes_written,
+            content_length,
+        })
     }
 
     pub async fn put_bytes(

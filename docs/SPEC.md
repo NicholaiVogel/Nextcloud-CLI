@@ -1277,6 +1277,10 @@ Backing API:
 Behavior:
 
 - Refuse to overwrite existing local file unless `--overwrite` is set.
+- Stream the response body to a temporary file next to the target path.
+- Atomically rename the temporary file after a complete write.
+- Remove partial files after failed downloads.
+- Verify byte count when the server provides `Content-Length`.
 - Create parent directories only if `--parents` is added in the future.
 - Write metadata JSON to stdout after successful download.
 
@@ -1287,7 +1291,8 @@ Expected output:
   "remote": "/Documents/report.pdf",
   "local": "./report.pdf",
   "bytes_written": 123456,
-  "etag": "abc123"
+  "content_length": 123456,
+  "overwritten": false
 }
 ```
 
@@ -5191,10 +5196,14 @@ nextcloud-cli server capabilities --format json
 
 ### 41.3 Phase 2: WebDAV files core
 
-Status: partial. The WebDAV client, multistatus parser, path normalization,
+Status: complete for the core WebDAV file surface. The WebDAV client,
+multistatus parser, path normalization,
 `files list`, `files search`, `files stat`, `files mkdir --parents`,
 `files upload`, `files download`, and `files delete` are implemented.
-Streaming large-download handling and mock HTTP tests remain pending.
+`files download` streams to a temporary file and verifies `Content-Length` when
+available. Mock HTTP coverage exists for WebDAV request methods, paths, headers,
+bodies, success parsing, failure mapping, upload, and streaming download.
+Richer content/local-index search remains a later search-backend feature.
 
 Deliverables:
 
@@ -5206,9 +5215,9 @@ Deliverables:
 - `files stat`: implemented
 - `files mkdir`: implemented with `--dry-run`, MKCOL, and `--parents`
 - `files upload` simple PUT path: implemented
-- `files download` buffered path: implemented; streaming large-download path pending
+- `files download` streaming path: implemented with temp-file write and byte-count verification
 - `files delete`: implemented with `--dry-run`, `--yes`, and root-path rejection
-- richer content/local-index search: pending
+- richer content/local-index search: deferred to search-backend phase
 
 Completion signal:
 
