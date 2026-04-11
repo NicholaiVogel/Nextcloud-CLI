@@ -6,8 +6,9 @@ Generated command metadata is available from the CLI:
 nextcloud-cli commands schema --format json
 ```
 
-The current implementation covers the repository spine, auth/profile/server
-detection, core WebDAV file-transfer commands, and initial OCS share listing:
+The current implementation covers auth/profile/server detection, core WebDAV
+file commands, shares, calendar, contacts, Activity, Notes, Deck, smoke checks,
+and update checks:
 
 - `commands schema`
 - `config path`

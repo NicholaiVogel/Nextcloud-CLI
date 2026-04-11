@@ -67,8 +67,9 @@ Completed so far:
 - `files list`, `files stat`, `files mkdir --parents`, `files upload`,
   `files download`, `files search`, and `files delete --yes`.
 - Command metadata through `commands schema`.
-- README plus `docs/COMMANDS.md`, `docs/CONFIG.md`, `docs/INSTALL.md`,
-  `docs/NETWORK.md`, `docs/SMOKE.md`, and `docs/COMPATIBILITY.md`.
+- Marketing-focused README plus `docs/USAGE.md`, `docs/COMMANDS.md`,
+  `docs/CONFIG.md`, `docs/INSTALL.md`, `docs/NETWORK.md`, `docs/SMOKE.md`,
+  and `docs/COMPATIBILITY.md`.
 - GitHub Actions CI for fmt, clippy, and tests.
 
 Validation that passed after the current implementation:
@@ -5138,6 +5139,7 @@ The setup skill is complete only when:
 MVP documentation must include:
 
 - README quickstart
+- usage guide for technical setup and common workflows
 - authentication setup
 - command reference
 - config and migration reference
@@ -5190,7 +5192,7 @@ The docs should explicitly say:
 A release candidate is ready only when:
 
 - [ ] `docs/SPEC.md` is up to date.
-- [ ] README quickstart matches behavior.
+- [x] README quickstart matches behavior.
 - [ ] All public commands have examples.
 - [ ] All command examples are tested or manually smoke-verified.
 - [ ] `cargo fmt --check` passes.
@@ -5418,7 +5420,8 @@ implemented. Real self-update and terminal art remain pending.
 
 Deliverables:
 
-- README quickstart: implemented for source/development workflow
+- README quickstart: implemented in the marketing-focused README, with detailed
+  workflows moved to `docs/USAGE.md`
 - install docs: partial, source, GitHub Release, and npm install documented
 - npm wrapper: implemented under `npm/nextcloud-cli` and published as
   `nextcloud-cli`
