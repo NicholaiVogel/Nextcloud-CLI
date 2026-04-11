@@ -4,12 +4,18 @@
 </h1>
 
 <p align="center">
-  <strong>Unofficial client-side CLI for Nextcloud.</strong>
+  <strong>An unofficial, client-side Nextcloud CLI for humans, scripts, and AI agents.</strong>
 </p>
 
 <p align="center">
-  Stable JSON output by default, secure credential storage, and commands for
-  humans, shell scripts, and AI agents.
+  Stable JSON output, secure credential storage, guarded writes, and a practical
+  command surface over existing Nextcloud APIs.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/nextcloud-cli"><img alt="npm" src="https://img.shields.io/npm/v/nextcloud-cli?color=0082c9"></a>
+  <a href="https://github.com/NicholaiVogel/Nextcloud-CLI/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/NicholaiVogel/Nextcloud-CLI?color=0082c9"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 </p>
 
 > [!NOTE]
@@ -20,8 +26,8 @@
 
 `nxc` talks to existing Nextcloud HTTP APIs from a local machine, SSH session,
 CI job, or agent runtime. It authenticates as a normal user and provides a
-scriptable handle on files today, with shares, calendars, contacts, Notes,
-Deck, Activity, and raw DAV/OCS commands planned in the spec.
+scriptable handle on files, shares, calendars, contacts, Notes, Deck, Activity,
+and raw DAV/OCS commands.
 
 Both command names are supported:
 
@@ -34,7 +40,7 @@ long command name.
 ## Contents
 
 - [Status](#status)
-- [Install from source](#install-from-source)
+- [Install](#install)
 - [Quick start](#quick-start)
 - [Authentication](#authentication)
 - [Implemented commands](#implemented-commands)
@@ -52,53 +58,66 @@ long command name.
 
 ## Status
 
-The current implementation covers the repository spine, authentication,
-profiles, server status/capability checks, WebDAV files, sharing safety,
-calendar/contact basics, and first-pass optional app support.
+`nxc` is usable today and published as both GitHub release binaries and an npm
+package. It is still pre-1.0, so command details may change as the product
+hardens.
 
-Implemented today:
-
-- Login Flow v2 authentication with `auth login`
-- headless app-password minting with `auth app-password`
-- existing app-password registration with `auth add`
-- OS keyring storage with owner-only file fallback for headless environments
-- profile creation, listing, inspection, and default selection
-- server status and capabilities
-- WebDAV file list, name search, stat, mkdir, upload, streaming download, and delete
-- OCS share listing, public link share dry-runs, guarded creation, delete, and revoke
-- calendar event listing, creation, and deletion
-- contact search, creation, and deletion
-- activity feed listing
-- Notes list, create, update, and delete
-- Deck board/card listing plus board, stack, and card creation
-- machine-readable command metadata with `commands schema`
+| Area | Current support |
+| --- | --- |
+| Auth | Login Flow v2, headless app-password minting, existing app-password registration |
+| Credentials | OS keyring with owner-only file fallback for SSH/headless environments |
+| Profiles | create, list, inspect, default selection, local safety policy |
+| Server | status and capabilities |
+| Files | list, search, stat, mkdir, upload, streaming download, guarded delete |
+| Shares | list, public-link dry-run/create, guarded delete/revoke |
+| Calendar | event listing, create, guarded delete |
+| Contacts | search, create, guarded delete |
+| Optional apps | Activity, Notes, and Deck commands |
+| Agents | JSON output, command schema, redacted smoke reports |
 
 The canonical product contract lives in [`docs/SPEC.md`](docs/SPEC.md).
 
-## Install from source
+## Install
 
-Release binaries are produced for tagged releases. The npm package is published
-as `nextcloud-cli` and exposes both `nextcloud-cli` and `nxc`:
+### npm
+
+The npm package is the easiest path for most agent and SSH environments. It
+downloads the matching GitHub release archive, verifies the SHA-256 checksum,
+and exposes both command names.
 
 ```bash
 npm install -g nextcloud-cli
 nxc --help
 ```
 
-The Homebrew tap and curl installer are still planned. For active development,
-install from source:
+### curl
+
+The curl installer uses the latest GitHub release and installs into
+`$HOME/.local/bin` by default.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/install.sh | sh
+```
+
+Choose a directory or version when needed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/install.sh | INSTALL_DIR=/usr/local/bin sh
+curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/install.sh | NEXTCLOUD_CLI_INSTALL_VERSION=0.1.0 sh
+```
+
+### GitHub Releases
+
+Download a native archive from
+[`releases`](https://github.com/NicholaiVogel/Nextcloud-CLI/releases), verify
+the matching `.sha256` file, and put both binaries on your `PATH`.
+
+### Source
 
 ```bash
 git clone https://github.com/NicholaiVogel/Nextcloud-CLI.git
 cd Nextcloud-CLI
 cargo install --path crates/nextcloud-cli --locked
-```
-
-That installs both binaries:
-
-```bash
-nxc --help
-nextcloud-cli --help
 ```
 
 Run from a checkout without installing:
@@ -501,19 +520,13 @@ More detailed smoke instructions live in [`docs/SMOKE.md`](docs/SMOKE.md).
 
 ## Roadmap
 
-Current Phase 3 work is sharing and safety policy:
+The current focus is distribution polish and agent experience:
 
-- OCS client and envelope parser, implemented
-- `shares list`, implemented
-- public link creation with dry-run support and guarded actual execution,
-  implemented
-- share revoke/delete with dry-run support and explicit confirmation,
-  implemented
-- per-profile policy enforcement
-- secret-redacted JSONL audit events for write commands, implemented
-
-Later phases cover calendar, contacts, Notes, Deck, Activity, raw DAV/OCS
-commands, release binaries, npm, a curl installer, Homebrew, and agent skills.
+- Homebrew tap
+- real `update apply`
+- Linux arm64, musl Linux, and Windows arm64 release assets
+- setup and workflow skills for coding agents
+- broader compatibility hardening across Nextcloud server versions and apps
 
 ## Documentation
 

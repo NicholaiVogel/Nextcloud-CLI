@@ -29,6 +29,28 @@ sudo install -m 0755 "${base}/nxc" /usr/local/bin/nxc
 
 Windows release assets are also `.tar.gz` archives with `.exe` binaries inside.
 
+## Install with curl
+
+The curl installer detects your platform, resolves the latest release, verifies
+the archive checksum, and installs both `nextcloud-cli` and `nxc`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/install.sh | sh
+```
+
+By default, it installs into `$HOME/.local/bin` so root is not required. Override
+the install directory when needed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/install.sh | INSTALL_DIR=/usr/local/bin sh
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/install.sh | NEXTCLOUD_CLI_INSTALL_VERSION=0.1.0 sh
+```
+
 ## npm wrapper
 
 The npm package is published as `nextcloud-cli` and exposes both command names:
@@ -53,5 +75,5 @@ NEXTCLOUD_CLI_BINARY=../../target/debug/nextcloud-cli npm exec -- nxc --help
 
 ## Planned installers
 
-The curl installer, Homebrew tap, and Cargo publishing support are specified in
+The Homebrew tap and Cargo publishing support are specified in
 [`SPEC.md`](SPEC.md) and will land after the binary release path is proven.

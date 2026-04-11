@@ -4694,8 +4694,13 @@ A curl installer should also be supported because it is convenient for humans,
 servers, and agents that do not want npm as the installer layer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/install.sh | sh
 ```
+
+Status: implemented at `install.sh`. It defaults to the latest GitHub Release,
+supports `NEXTCLOUD_CLI_INSTALL_VERSION`, installs into `$HOME/.local/bin` by
+default, supports `INSTALL_DIR`/`NEXTCLOUD_CLI_INSTALL_DIR`, verifies checksums,
+and installs both command names.
 
 The install script must:
 
@@ -5200,17 +5205,17 @@ A release candidate is ready only when:
 - [ ] Fixture/snapshot secret scan passes.
 - [ ] Secrets are redacted in snapshot tests.
 - [ ] Binary name `nextcloud-cli` works.
-- [ ] Alias `nxc` works.
-- [ ] Version output works.
-- [ ] Help output works.
+- [x] Alias `nxc` works.
+- [x] Version output works.
+- [x] Help output works.
 - [ ] Human-facing help or first-run output includes terminal art.
 - [ ] JSON and agent-mode outputs contain no terminal art.
 - [ ] `--no-art` and `NEXTCLOUD_CLI_NO_ART=1` work.
-- [ ] README states the project is unofficial and client-side.
-- [ ] Install/package path is documented.
-- [ ] GitHub Release artifacts and checksums are produced.
-- [ ] npm installer downloads, verifies, and runs the release binary.
-- [ ] curl installer downloads, verifies, and installs both binaries.
+- [x] README states the project is unofficial and client-side.
+- [x] Install/package path is documented.
+- [x] GitHub Release artifacts and checksums are produced.
+- [x] npm installer downloads, verifies, and runs the release binary.
+- [x] curl installer downloads, verifies, and installs both binaries.
 - [ ] `nextcloud-cli update check` and direct-binary `update apply --yes` are tested.
 - [ ] Cargo package dry-run or publish succeeds.
 - [ ] `skills/nextcloud-cli-setup/SKILL.md` exists.
@@ -5407,8 +5412,8 @@ nextcloud-cli activity recent --limit 20 --format json
 ### 41.7 Phase 6: distribution and agent experience
 
 Status: partial. README, install/config/network/smoke docs, CI, `nxc` alias,
-tagged GitHub release binary packaging, npm package publication, and placeholder
-`update check` are implemented. curl installer, real self-update, skills, and
+tagged GitHub release binary packaging, npm package publication, curl installer,
+and placeholder `update check` are implemented. Real self-update, skills, and
 terminal art remain pending.
 
 Deliverables:
@@ -5417,7 +5422,7 @@ Deliverables:
 - install docs: partial, source, GitHub Release, and npm install documented
 - npm wrapper: implemented under `npm/nextcloud-cli` and published as
   `nextcloud-cli`
-- curl installer: pending
+- curl installer: implemented at `install.sh`
 - GitHub Release artifact naming and checksum verification: implemented for
   tagged releases
 - `update check`: partial, development placeholder implemented

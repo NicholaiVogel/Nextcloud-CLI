@@ -17,6 +17,8 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      - run: sh -n install.sh
+      - run: sh tests/install_script_test.sh
       - uses: actions/setup-node@v4
         with:
           node-version: 20
