@@ -159,6 +159,8 @@ Current focus:
 - additional release targets
 - more polished human output
 
+Future feature planning lives in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
 ## Documentation
 
 - [`docs/USAGE.md`](docs/USAGE.md), authentication, profiles, workflows, output,
@@ -166,6 +168,7 @@ Current focus:
 - [`docs/INSTALL.md`](docs/INSTALL.md), install methods and release artifacts
 - [`docs/COMMANDS.md`](docs/COMMANDS.md), implemented command surface
 - [`docs/CONFIG.md`](docs/CONFIG.md), configuration and credential behavior
+- [`docs/ROADMAP.md`](docs/ROADMAP.md), future feature planning
 - [`docs/SMOKE.md`](docs/SMOKE.md), safe real-server validation
 - [`docs/NETWORK.md`](docs/NETWORK.md), network, proxy, and TLS behavior
 - [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md), tested Nextcloud servers

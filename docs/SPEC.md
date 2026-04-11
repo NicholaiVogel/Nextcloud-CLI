@@ -68,8 +68,8 @@ Completed so far:
   `files download`, `files search`, and `files delete --yes`.
 - Command metadata through `commands schema`.
 - Marketing-focused README plus `docs/USAGE.md`, `docs/COMMANDS.md`,
-  `docs/CONFIG.md`, `docs/INSTALL.md`, `docs/NETWORK.md`, `docs/SMOKE.md`,
-  and `docs/COMPATIBILITY.md`.
+  `docs/CONFIG.md`, `docs/INSTALL.md`, `docs/NETWORK.md`,
+  `docs/ROADMAP.md`, `docs/SMOKE.md`, and `docs/COMPATIBILITY.md`.
 - GitHub Actions CI for fmt, clippy, and tests.
 
 Validation that passed after the current implementation:
@@ -5151,6 +5151,7 @@ MVP documentation must include:
 - AI agent usage notes
 - security notes
 - installation and distribution methods
+- future feature roadmap
 - setup agent skill usage
 - basic feature skill usage for files, shares, calendar, contacts, notes, deck,
   and activity
@@ -5466,5 +5467,10 @@ These are intentionally outside MVP decision-making:
    `openapi.json` files?
 5. Should the CLI become a formal Nextcloud app or remain a standalone package?
 6. Should agent skills be generated from command metadata or handwritten?
+
+Feature planning for file versions, trashbin restore, richer shares, unified and
+full-text search, comments/tags/favorites, notifications, admin provisioning,
+server diagnostics, OCC support, and sync/mirror lives in
+[`docs/ROADMAP.md`](ROADMAP.md).
 
 These questions must not block the issue-complete MVP.
