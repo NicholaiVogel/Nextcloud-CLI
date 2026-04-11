@@ -75,9 +75,9 @@ convenience hacks.
   creation exist. Remaining Deck work is card update/move/archive/delete and
   broader optional-app smoke cleanup.
 - Phase 6: distribution and agent experience, partially implemented. README,
-  command metadata, CI, `nxc` alias, and placeholder `update check` exist.
-  Release packaging, npm wrapper, curl installer, real self-update, and agent
-  skills remain planned.
+  command metadata, CI, `nxc` alias, tagged GitHub release packaging, and
+  placeholder `update check` exist. npm wrapper, curl installer, real
+  self-update, and agent skills remain planned.
 
 When continuing autonomously, complete the next smallest vertical slice,
 validate it, smoke it safely, commit it, push it, then update memory.

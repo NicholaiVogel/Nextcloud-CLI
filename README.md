@@ -53,7 +53,8 @@ long command name.
 ## Status
 
 The current implementation covers the repository spine, authentication,
-profiles, server status/capability checks, and the core WebDAV file surface.
+profiles, server status/capability checks, WebDAV files, sharing safety,
+calendar/contact basics, and first-pass optional app support.
 
 Implemented today:
 
@@ -64,16 +65,21 @@ Implemented today:
 - profile creation, listing, inspection, and default selection
 - server status and capabilities
 - WebDAV file list, name search, stat, mkdir, upload, streaming download, and delete
-- OCS share listing
-- public link share dry-runs and guarded creation
+- OCS share listing, public link share dry-runs, guarded creation, delete, and revoke
+- calendar event listing, creation, and deletion
+- contact search, creation, and deletion
+- activity feed listing
+- Notes list, create, update, and delete
+- Deck board/card listing plus board, stack, and card creation
 - machine-readable command metadata with `commands schema`
 
 The canonical product contract lives in [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Install from source
 
-Release binaries, an npm wrapper, a Homebrew tap, and a curl installer are
-planned. For now, install from source:
+Release binaries are produced for tagged releases. The npm wrapper, Homebrew
+tap, and curl installer are still planned. For active development, install from
+source:
 
 ```bash
 git clone https://github.com/NicholaiVogel/Nextcloud-CLI.git

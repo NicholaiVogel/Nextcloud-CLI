@@ -5369,9 +5369,10 @@ nextcloud-cli activity recent --limit 20 --format json
 
 ### 41.7 Phase 6: distribution and agent experience
 
-Status: partial. README, install/config/network/smoke docs, CI, `nxc` alias, and
-placeholder `update check` are implemented. Release packaging, npm wrapper, curl
-installer, real self-update, skills, and terminal art remain pending.
+Status: partial. README, install/config/network/smoke docs, CI, `nxc` alias,
+tagged GitHub release binary packaging, and placeholder `update check` are
+implemented. npm wrapper, curl installer, real self-update, skills, and terminal
+art remain pending.
 
 Deliverables:
 
@@ -5379,7 +5380,8 @@ Deliverables:
 - install docs: partial, source install documented
 - npm wrapper: pending
 - curl installer: pending
-- GitHub Release artifact naming and checksum verification: pending
+- GitHub Release artifact naming and checksum verification: implemented for
+  tagged releases
 - `update check`: partial, development placeholder implemented
 - direct-binary `update apply --yes`: pending
 - setup agent skill: pending
