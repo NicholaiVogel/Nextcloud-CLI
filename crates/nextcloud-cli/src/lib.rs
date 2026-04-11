@@ -370,6 +370,8 @@ async fn handle_files(
     let app_password = credential_store.get_app_password(&profile.credential)?;
     let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
     let webdav = WebDavClient::new(client, profile.username.clone());
+    let profile_name = profile.name.clone();
+    let server = profile.server.to_string();
 
     match command {
         FilesCommand::List(args) => {
@@ -407,6 +409,8 @@ async fn handle_files(
                 "method": "MKCOL",
                 "parents": args.parents,
                 "parents_created": parents_created,
+                "profile": profile_name,
+                "server": server,
             }))
         }
         FilesCommand::Upload(args) => {
@@ -433,6 +437,8 @@ async fn handle_files(
             });
 
             json_value(FilesUploadOutput {
+                profile: profile_name,
+                server,
                 remote,
                 local: local.display().to_string(),
                 bytes_uploaded,
@@ -456,10 +462,33 @@ async fn handle_files(
             })?;
 
             json_value(FilesDownloadOutput {
+                profile: profile_name,
+                server,
                 remote,
                 local: local.display().to_string(),
                 bytes_written,
                 overwritten: args.overwrite,
+            })
+        }
+        FilesCommand::Delete(args) => {
+            let path = nextcloud::webdav::normalize_remote_path(&args.path)?;
+            nextcloud::webdav::reject_root_path(&path)?;
+            if !args.dry_run && !args.yes {
+                return Err(CliError::ConfirmationRequired);
+            }
+            let entry = webdav.stat(&path).await?;
+            if !args.dry_run {
+                webdav.delete(&path).await?;
+            }
+
+            json_value(FilesDeleteOutput {
+                profile: profile_name,
+                server,
+                path,
+                dry_run: args.dry_run,
+                deleted: !args.dry_run,
+                confirmed: args.yes,
+                entry,
             })
         }
     }
@@ -658,6 +687,8 @@ struct AuthStatusOutput {
 
 #[derive(Debug, Serialize)]
 struct FilesUploadOutput {
+    profile: String,
+    server: String,
     remote: String,
     local: String,
     bytes_uploaded: u64,
@@ -668,10 +699,23 @@ struct FilesUploadOutput {
 
 #[derive(Debug, Serialize)]
 struct FilesDownloadOutput {
+    profile: String,
+    server: String,
     remote: String,
     local: String,
     bytes_written: u64,
     overwritten: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct FilesDeleteOutput {
+    profile: String,
+    server: String,
+    path: String,
+    dry_run: bool,
+    deleted: bool,
+    confirmed: bool,
+    entry: Option<nextcloud::WebDavEntry>,
 }
 
 #[derive(Debug, Serialize)]

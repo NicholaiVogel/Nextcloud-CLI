@@ -168,6 +168,7 @@ pub enum FilesCommand {
     Mkdir(FilesMkdirArgs),
     Upload(FilesUploadArgs),
     Download(FilesDownloadArgs),
+    Delete(FilesDeleteArgs),
 }
 
 #[derive(Debug, Args)]
@@ -208,6 +209,17 @@ pub struct FilesDownloadArgs {
 
     #[arg(long, default_value_t = false)]
     pub overwrite: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct FilesDeleteArgs {
+    pub path: String,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub yes: bool,
 }
 
 #[derive(Debug, Subcommand)]

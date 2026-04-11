@@ -28,6 +28,11 @@ pub enum CliError {
     #[error("remote path {path} already exists; pass --overwrite to replace it")]
     RemotePathExists { path: String },
 
+    #[error(
+        "destructive command requires confirmation; pass --yes to continue or --dry-run to preview"
+    )]
+    ConfirmationRequired,
+
     #[error("failed to read credentials from {path}: {source}")]
     CredentialRead {
         path: PathBuf,
@@ -94,6 +99,7 @@ impl CliError {
             Self::LocalFileExists { .. } => "local_file_exists",
             Self::LocalUploadNotFile { .. } => "local_upload_not_file",
             Self::RemotePathExists { .. } => "remote_path_exists",
+            Self::ConfirmationRequired => "confirmation_required",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
             Self::CredentialParse { .. } => "credential_parse_failed",
@@ -119,6 +125,7 @@ impl CliError {
             Self::LocalFileExists { .. } => 2,
             Self::LocalUploadNotFile { .. } => 2,
             Self::RemotePathExists { .. } => 2,
+            Self::ConfirmationRequired => 2,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,
             Self::Core(nextcloud::Error::Http(_)) => 3,

@@ -27,4 +27,5 @@ auth/profile/server detection slice, and the core WebDAV file-transfer commands:
 - `files mkdir <path> [--parents] [--dry-run]`
 - `files upload <local> <remote> [--overwrite] [--content-type <mime>]`
 - `files download <remote> <local> [--overwrite]`
+- `files delete <path> [--dry-run] --yes`
 - `update check`

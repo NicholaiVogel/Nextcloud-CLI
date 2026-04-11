@@ -86,6 +86,16 @@ impl WebDavClient {
         self.client.request_bytes(Method::GET, &dav_path).await
     }
 
+    pub async fn delete(&self, remote_path: &str) -> Result<()> {
+        let normalized = normalize_remote_path(remote_path)?;
+        reject_root_path(&normalized)?;
+        let dav_path = self.dav_path(&normalized)?;
+        self.client
+            .request_text(Method::DELETE, &dav_path, None)
+            .await?;
+        Ok(())
+    }
+
     pub async fn exists(&self, remote_path: &str) -> Result<bool> {
         Ok(self.stat_if_exists(remote_path).await?.is_some())
     }

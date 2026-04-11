@@ -48,5 +48,7 @@ cargo run -p nextcloud-cli -- --profile personal files upload "$LOCAL_SRC" "$REM
 cargo run -p nextcloud-cli -- --profile personal files stat "$REMOTE_FILE"
 cargo run -p nextcloud-cli -- --profile personal files download "$REMOTE_FILE" "$LOCAL_DST"
 cmp "$LOCAL_SRC" "$LOCAL_DST"
+cargo run -p nextcloud-cli -- --profile personal files delete "$REMOTE_DIR" --dry-run
+cargo run -p nextcloud-cli -- --profile personal files delete "$REMOTE_DIR" --yes
 rm -f "$LOCAL_SRC" "$LOCAL_DST"
 ```

@@ -23,6 +23,7 @@ cargo run -p nextcloud-cli -- server capabilities --refresh
 cargo run -p nextcloud-cli -- files list /
 cargo run -p nextcloud-cli -- files upload ./summary.md /Documents/summary.md
 cargo run -p nextcloud-cli -- files download /Documents/brief.md ./brief.md
+cargo run -p nextcloud-cli -- files delete /Documents/old-summary.md --yes
 ```
 
 The CLI defaults to JSON output. Secrets are not stored in `config.json`; the

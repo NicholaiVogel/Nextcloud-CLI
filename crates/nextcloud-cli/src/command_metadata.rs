@@ -98,6 +98,11 @@ pub fn command_schema() -> CommandSchema {
                 "FilesDownloadResult",
             ),
             stable(
+                "files delete",
+                "Delete a remote Nextcloud path through WebDAV with explicit confirmation.",
+                "FilesDeleteResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",
