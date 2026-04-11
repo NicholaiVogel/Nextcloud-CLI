@@ -65,11 +65,19 @@ convenience hacks.
 
 ## Phase map
 
-- Phase 2: WebDAV file core.
-- Phase 3: sharing and safety policy.
-- Phase 4: calendar and contacts.
-- Phase 5: optional apps, Notes, Deck, Activity.
-- Phase 6: distribution and agent experience.
+- Phase 2: WebDAV file core, implemented.
+- Phase 3: sharing and safety policy, implemented for public share
+  create/list/delete/revoke and profile policy commands.
+- Phase 4: calendar and contacts, implemented for list/search, create, and
+  delete. Update commands and deeper compatibility hardening remain planned.
+- Phase 5: optional apps, substantially implemented. Activity read, Notes
+  list/create/update/delete, Deck boards/cards listing, and Deck board/stack/card
+  creation exist. Remaining Deck work is card update/move/archive/delete and
+  broader optional-app smoke cleanup.
+- Phase 6: distribution and agent experience, partially implemented. README,
+  command metadata, CI, `nxc` alias, and placeholder `update check` exist.
+  Release packaging, npm wrapper, curl installer, real self-update, and agent
+  skills remain planned.
 
 When continuing autonomously, complete the next smallest vertical slice,
 validate it, smoke it safely, commit it, push it, then update memory.
