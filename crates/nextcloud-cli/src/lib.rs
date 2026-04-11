@@ -1142,6 +1142,66 @@ async fn handle_calendar(
                 "event": created,
             }))
         }
+        CalendarCommand::Delete(args) => {
+            if args.dry_run {
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "calendar.delete",
+                        true,
+                        "DELETE",
+                        "/remote.php/dav/calendars/{username}/{calendar}/{uid}.ics",
+                        target([
+                            ("calendar", json!(args.calendar.clone())),
+                            ("uid", json!(args.uid.clone())),
+                        ]),
+                    ),
+                );
+                return json_value(DeleteObjectOutput {
+                    profile: profile.name,
+                    server: profile.server.to_string(),
+                    command: "calendar delete".to_owned(),
+                    object_type: "calendar_event".to_owned(),
+                    collection: args.calendar,
+                    id: args.uid,
+                    dry_run: true,
+                    deleted: false,
+                    confirmed: false,
+                });
+            }
+            if !args.yes {
+                return Err(CliError::ConfirmationRequired);
+            }
+            calendar.delete_event(&args.calendar, &args.uid).await?;
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "calendar.delete",
+                    false,
+                    "DELETE",
+                    "/remote.php/dav/calendars/{username}/{calendar}/{uid}.ics",
+                    target([
+                        ("calendar", json!(args.calendar.clone())),
+                        ("uid", json!(args.uid.clone())),
+                    ]),
+                ),
+            );
+            json_value(DeleteObjectOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                command: "calendar delete".to_owned(),
+                object_type: "calendar_event".to_owned(),
+                collection: args.calendar,
+                id: args.uid,
+                dry_run: false,
+                deleted: true,
+                confirmed: true,
+            })
+        }
     }
 }
 
@@ -1300,6 +1360,66 @@ async fn handle_contacts(
                 "created": true,
                 "contact": created,
             }))
+        }
+        ContactsCommand::Delete(args) => {
+            if args.dry_run {
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "contacts.delete",
+                        true,
+                        "DELETE",
+                        "/remote.php/dav/addressbooks/users/{username}/{addressbook}/{uid}.vcf",
+                        target([
+                            ("addressbook", json!(args.addressbook.clone())),
+                            ("uid", json!(args.uid.clone())),
+                        ]),
+                    ),
+                );
+                return json_value(DeleteObjectOutput {
+                    profile: profile.name,
+                    server: profile.server.to_string(),
+                    command: "contacts delete".to_owned(),
+                    object_type: "contact".to_owned(),
+                    collection: args.addressbook,
+                    id: args.uid,
+                    dry_run: true,
+                    deleted: false,
+                    confirmed: false,
+                });
+            }
+            if !args.yes {
+                return Err(CliError::ConfirmationRequired);
+            }
+            contacts.delete(&args.addressbook, &args.uid).await?;
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "contacts.delete",
+                    false,
+                    "DELETE",
+                    "/remote.php/dav/addressbooks/users/{username}/{addressbook}/{uid}.vcf",
+                    target([
+                        ("addressbook", json!(args.addressbook.clone())),
+                        ("uid", json!(args.uid.clone())),
+                    ]),
+                ),
+            );
+            json_value(DeleteObjectOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                command: "contacts delete".to_owned(),
+                object_type: "contact".to_owned(),
+                collection: args.addressbook,
+                id: args.uid,
+                dry_run: false,
+                deleted: true,
+                confirmed: true,
+            })
         }
     }
 }
@@ -1713,6 +1833,19 @@ struct ContactsCreatePreview {
     email_count: usize,
     phone_count: usize,
     organization_present: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct DeleteObjectOutput {
+    profile: String,
+    server: String,
+    command: String,
+    object_type: String,
+    collection: String,
+    id: String,
+    dry_run: bool,
+    deleted: bool,
+    confirmed: bool,
 }
 
 #[derive(Debug, Serialize)]

@@ -75,6 +75,14 @@ impl ContactsClient {
         })
     }
 
+    pub async fn delete(&self, addressbook: &str, uid: &str) -> Result<()> {
+        let path = self.contact_path(addressbook, uid);
+        self.client
+            .request_text(Method::DELETE, &path, None)
+            .await?;
+        Ok(())
+    }
+
     async fn discover_addressbooks(&self) -> Result<Vec<AddressBookRef>> {
         let body = r#"<?xml version="1.0" encoding="UTF-8"?>
 <d:propfind xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">

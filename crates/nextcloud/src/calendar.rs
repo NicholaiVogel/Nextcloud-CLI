@@ -79,6 +79,14 @@ impl CalendarClient {
         })
     }
 
+    pub async fn delete_event(&self, calendar: &str, uid: &str) -> Result<()> {
+        let path = self.event_path(calendar, uid);
+        self.client
+            .request_text(Method::DELETE, &path, None)
+            .await?;
+        Ok(())
+    }
+
     async fn discover_calendars(&self) -> Result<Vec<CalendarRef>> {
         let body = r#"<?xml version="1.0" encoding="UTF-8"?>
 <d:propfind xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">

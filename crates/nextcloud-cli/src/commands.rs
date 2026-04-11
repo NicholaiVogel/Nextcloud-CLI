@@ -335,6 +335,7 @@ pub struct SharesDeleteArgs {
 pub enum CalendarCommand {
     Events(CalendarEventsArgs),
     Create(CalendarCreateArgs),
+    Delete(CalendarDeleteArgs),
 }
 
 #[derive(Debug, Args)]
@@ -382,10 +383,25 @@ pub struct CalendarCreateArgs {
     pub dry_run: bool,
 }
 
+#[derive(Debug, Args)]
+pub struct CalendarDeleteArgs {
+    #[arg(long)]
+    pub calendar: String,
+
+    pub uid: String,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub yes: bool,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum ContactsCommand {
     Search(ContactsSearchArgs),
     Create(ContactsCreateArgs),
+    Delete(ContactsDeleteArgs),
 }
 
 #[derive(Debug, Args)]
@@ -418,6 +434,20 @@ pub struct ContactsCreateArgs {
 
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ContactsDeleteArgs {
+    #[arg(long)]
+    pub addressbook: String,
+
+    pub uid: String,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub yes: bool,
 }
 
 #[derive(Debug, Subcommand)]

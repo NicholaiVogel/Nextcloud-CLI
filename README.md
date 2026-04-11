@@ -194,8 +194,8 @@ Current commands:
 | Server | `server status`, `server capabilities [--refresh]` |
 | Files | `files list`, `files search`, `files stat`, `files mkdir`, `files upload`, `files download`, `files delete` |
 | Shares | `shares list`, `shares create --public`, `shares delete`, `shares revoke` |
-| Calendar | `calendar events`, `calendar create` |
-| Contacts | `contacts search`, `contacts create` |
+| Calendar | `calendar events`, `calendar create`, `calendar delete` |
+| Contacts | `contacts search`, `contacts create`, `contacts delete` |
 | Updates | `update check` |
 
 See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the implemented command list and

@@ -153,6 +153,11 @@ pub fn command_schema() -> CommandSchema {
                 "CalendarCreateResult",
             ),
             stable(
+                "calendar delete",
+                "Delete a calendar event through CalDAV with explicit confirmation.",
+                "CalendarDeleteResult",
+            ),
+            stable(
                 "contacts search",
                 "Search contacts through CardDAV addressbook-query.",
                 "ContactsSearchResult",
@@ -161,6 +166,11 @@ pub fn command_schema() -> CommandSchema {
                 "contacts create",
                 "Create a contact through CardDAV PUT, with dry-run support.",
                 "ContactsCreateResult",
+            ),
+            stable(
+                "contacts delete",
+                "Delete a contact through CardDAV with explicit confirmation.",
+                "ContactsDeleteResult",
             ),
             stable(
                 "update check",

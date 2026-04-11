@@ -1631,7 +1631,8 @@ Behavior:
 - Return normalized event metadata including href and ETag when available.
 - Status: initial implementation exists for dry-run previews and actual CalDAV
   PUT creation. Dry-run output reports whether a description was supplied without
-  echoing the description body.
+  echoing the description body. `calendar delete --calendar <name> <uid>` is
+  also implemented with dry-run and explicit confirmation.
 
 Expected output:
 
@@ -1789,7 +1790,8 @@ Behavior:
 - Return normalized contact metadata including href and ETag when available.
 - Status: initial implementation exists for dry-run previews and actual CardDAV
   PUT creation. Dry-run output reports email/phone counts rather than echoing
-  full contact payloads.
+  full contact payloads. `contacts delete --addressbook <name> <uid>` is also
+  implemented with dry-run and explicit confirmation.
 
 Completion gate:
 

@@ -933,6 +933,124 @@ fn contacts_create_dry_run_is_wired() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 #[test]
+fn calendar_and_contacts_delete_require_confirmation() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    for args in [
+        vec!["calendar", "delete", "--calendar", "personal", "event-1"],
+        vec![
+            "contacts",
+            "delete",
+            "--addressbook",
+            "contacts",
+            "contact-1",
+        ],
+    ] {
+        let mut command = Command::cargo_bin("nextcloud-cli")?;
+        command
+            .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+            .args([
+                "--config-dir",
+                temp.path().to_str().expect("utf8 path"),
+                "--profile",
+                "personal",
+            ])
+            .args(args)
+            .assert()
+            .failure()
+            .code(2)
+            .stderr(predicate::str::contains("confirmation_required"));
+    }
+
+    Ok(())
+}
+
+#[test]
+fn calendar_and_contacts_delete_dry_run() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "calendar",
+            "delete",
+            "--calendar",
+            "personal",
+            "event-1",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"deleted\": false"))
+        .stdout(predicate::str::contains(
+            "\"object_type\": \"calendar_event\"",
+        ));
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "contacts",
+            "delete",
+            "--addressbook",
+            "contacts",
+            "contact-1",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"deleted\": false"))
+        .stdout(predicate::str::contains("\"object_type\": \"contact\""));
+
+    Ok(())
+}
+
+#[test]
 fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
 
