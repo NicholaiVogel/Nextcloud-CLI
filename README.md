@@ -195,6 +195,7 @@ Current commands:
 | Files | `files list`, `files search`, `files stat`, `files mkdir`, `files upload`, `files download`, `files delete` |
 | Shares | `shares list`, `shares create --public`, `shares delete`, `shares revoke` |
 | Calendar | `calendar events` |
+| Contacts | `contacts search` |
 | Updates | `update check` |
 
 See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the implemented command list and

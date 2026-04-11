@@ -148,6 +148,11 @@ pub fn command_schema() -> CommandSchema {
                 "CalendarEventsResult",
             ),
             stable(
+                "contacts search",
+                "Search contacts through CardDAV addressbook-query.",
+                "ContactsSearchResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

@@ -19,8 +19,8 @@ use audit::{command_executed, record, remote_path_target, share_id_target, targe
 use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
     AuthAppPasswordArgs, AuthCommand, CalendarCommand, CalendarEventsArgs, Cli, Command,
-    CommandsCommand, ConfigCommand, FilesCommand, ProfilePolicySetArgs, ProfilesCommand,
-    ServerCommand, SharesCommand, UpdateCommand,
+    CommandsCommand, ConfigCommand, ContactsCommand, FilesCommand, ProfilePolicySetArgs,
+    ProfilesCommand, ServerCommand, SharesCommand, UpdateCommand,
 };
 use credential_store::CredentialStore;
 use error::{CliError, CliResult};
@@ -104,6 +104,15 @@ async fn run(cli: Cli) -> CliResult<Value> {
         }
         Command::Calendar(command) => {
             handle_calendar(
+                command,
+                selected_profile.as_deref(),
+                &store,
+                &credential_store,
+            )
+            .await
+        }
+        Command::Contacts(command) => {
+            handle_contacts(
                 command,
                 selected_profile.as_deref(),
                 &store,
@@ -1072,6 +1081,43 @@ async fn handle_calendar(
     }
 }
 
+async fn handle_contacts(
+    command: ContactsCommand,
+    selected_profile: Option<&str>,
+    store: &ConfigStore,
+    credential_store: &CredentialStore,
+) -> CliResult<Value> {
+    let profile = store.selected_profile(selected_profile)?;
+    let app_password = credential_store.get_app_password(&profile.credential)?;
+    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let contacts = nextcloud::ContactsClient::new(client, profile.username.clone());
+
+    match command {
+        ContactsCommand::Search(args) => {
+            if args.limit == 0 || args.limit > 100 {
+                return Err(CliError::InvalidLimit { value: args.limit });
+            }
+            let results = contacts
+                .search(&nextcloud::ContactSearchOptions {
+                    query: args.query.clone(),
+                    limit: args.limit,
+                    addressbook: args.addressbook.clone(),
+                })
+                .await?;
+            let count = results.len();
+            json_value(ContactsSearchOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                query: args.query,
+                addressbook: args.addressbook,
+                limit: args.limit,
+                contacts: results,
+                count,
+            })
+        }
+    }
+}
+
 fn resolve_calendar_range(args: &CalendarEventsArgs) -> CliResult<CalendarRangeOutput> {
     if let Some(date) = &args.date {
         return resolve_calendar_date(date);
@@ -1411,6 +1457,17 @@ struct CalendarEventsOutput {
     calendar: Option<String>,
     range: CalendarRangeOutput,
     events: Vec<nextcloud::CalendarEvent>,
+    count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct ContactsSearchOutput {
+    profile: String,
+    server: String,
+    query: String,
+    addressbook: Option<String>,
+    limit: u32,
+    contacts: Vec<nextcloud::Contact>,
     count: usize,
 }
 

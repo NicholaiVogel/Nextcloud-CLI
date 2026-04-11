@@ -719,6 +719,62 @@ fn calendar_events_rejects_bad_range_before_auth() -> Result<(), Box<dyn std::er
 }
 
 #[test]
+fn contacts_search_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    Command::cargo_bin("nextcloud-cli")?
+        .args(["contacts", "search", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--limit"))
+        .stdout(predicate::str::contains("--addressbook"));
+
+    Ok(())
+}
+
+#[test]
+fn contacts_search_rejects_bad_limit_before_network() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "contacts",
+            "search",
+            "Ada",
+            "--limit",
+            "0",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("invalid_limit"));
+
+    Ok(())
+}
+
+#[test]
 fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
 

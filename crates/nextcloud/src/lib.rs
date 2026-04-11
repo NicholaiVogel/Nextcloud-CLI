@@ -8,6 +8,7 @@ pub mod calendar;
 pub mod capabilities;
 pub mod client;
 pub mod config_schema;
+pub mod contacts;
 pub mod error;
 pub mod models;
 pub mod ocs;
@@ -24,6 +25,7 @@ pub use client::{ClientAuth, DownloadedBytes, NextcloudClient};
 pub use config_schema::{
     CliConfig, ConfigPaths, ConfigStore, CredentialRef, Profile, ProfilePolicy,
 };
+pub use contacts::{Contact, ContactSearchOptions, ContactsClient};
 pub use error::{Error, Result};
 pub use ocs::{OcsEnvelope, OcsMeta};
 pub use shares::{Share, ShareCreatePublicOptions, ShareListOptions, SharesClient};

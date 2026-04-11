@@ -60,6 +60,9 @@ pub enum Command {
     Calendar(CalendarCommand),
 
     #[command(subcommand)]
+    Contacts(ContactsCommand),
+
+    #[command(subcommand)]
     Update(UpdateCommand),
 }
 
@@ -349,6 +352,22 @@ pub struct CalendarEventsArgs {
 
     #[arg(long)]
     pub calendar: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ContactsCommand {
+    Search(ContactsSearchArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ContactsSearchArgs {
+    pub query: String,
+
+    #[arg(long, default_value_t = 25)]
+    pub limit: u32,
+
+    #[arg(long)]
+    pub addressbook: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]

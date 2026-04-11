@@ -1739,6 +1739,8 @@ Behavior:
 - Search across all discovered user address books by default.
 - Default limit is `25`.
 - Empty results are success.
+- Status: initial read-only implementation exists for CardDAV address book
+  discovery, `addressbook-query` REPORT, and basic vCard parsing.
 
 Expected output:
 
@@ -5291,7 +5293,7 @@ Deliverables:
   listing
 - calendar create/update/delete with dry-run and ETag behavior
 - CardDAV discovery and search
-- vCard parsing and serialization
+- vCard parsing: initial parser implemented for read-only contact search
 - contacts create/update/delete with dry-run and ETag behavior
 
 Completion signal:
