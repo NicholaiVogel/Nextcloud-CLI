@@ -18,7 +18,7 @@ use zeroize::Zeroizing;
 use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
     AuthAppPasswordArgs, AuthCommand, Cli, Command, CommandsCommand, ConfigCommand, FilesCommand,
-    ProfilesCommand, ServerCommand, SharesCommand, UpdateCommand,
+    ProfilePolicySetArgs, ProfilesCommand, ServerCommand, SharesCommand, UpdateCommand,
 };
 use credential_store::CredentialStore;
 use error::{CliError, CliResult};
@@ -178,7 +178,107 @@ fn handle_profiles(command: ProfilesCommand, store: &ConfigStore) -> CliResult<V
                 "updated": true,
             }))
         }
+        ProfilesCommand::Policy(command) => handle_profile_policy(command, store),
     }
+}
+
+fn handle_profile_policy(
+    command: commands::ProfilePolicyCommand,
+    store: &ConfigStore,
+) -> CliResult<Value> {
+    match command {
+        commands::ProfilePolicyCommand::Show(args) => {
+            let config = store.load()?;
+            let profile = config
+                .profiles
+                .get(&args.name)
+                .ok_or_else(|| nextcloud::Error::ProfileNotFound { name: args.name })?;
+            json_value(ProfilePolicyOutput {
+                profile: profile.name.clone(),
+                server: profile.server.to_string(),
+                policy: profile.policy.clone(),
+                updated: false,
+            })
+        }
+        commands::ProfilePolicyCommand::Set(args) => {
+            let mut config = store.load()?;
+            let profile = config.profiles.get_mut(&args.name).ok_or_else(|| {
+                nextcloud::Error::ProfileNotFound {
+                    name: args.name.clone(),
+                }
+            })?;
+            let changed = apply_profile_policy_changes(profile, &args)?;
+            if changed.is_empty() {
+                return Err(CliError::NoPolicyChanges);
+            }
+            profile.updated_at = Utc::now();
+            let output = ProfilePolicySetOutput {
+                profile: profile.name.clone(),
+                server: profile.server.to_string(),
+                policy: profile.policy.clone(),
+                updated: true,
+                changed,
+            };
+            store.save(&config)?;
+            json_value(output)
+        }
+        commands::ProfilePolicyCommand::Reset(args) => {
+            if !args.yes {
+                return Err(CliError::ConfirmationRequired);
+            }
+
+            let mut config = store.load()?;
+            let profile = config.profiles.get_mut(&args.name).ok_or_else(|| {
+                nextcloud::Error::ProfileNotFound {
+                    name: args.name.clone(),
+                }
+            })?;
+            profile.policy = nextcloud::ProfilePolicy::default();
+            profile.updated_at = Utc::now();
+            let output = ProfilePolicyResetOutput {
+                profile: profile.name.clone(),
+                server: profile.server.to_string(),
+                policy: profile.policy.clone(),
+                updated: true,
+                reset: true,
+            };
+            store.save(&config)?;
+            json_value(output)
+        }
+    }
+}
+
+fn apply_profile_policy_changes(
+    profile: &mut Profile,
+    args: &ProfilePolicySetArgs,
+) -> CliResult<Vec<String>> {
+    let mut changed = Vec::new();
+    if let Some(value) = args.agent_mode
+        && profile.policy.agent_mode != value
+    {
+        profile.policy.agent_mode = value;
+        changed.push("agent_mode".to_owned());
+    }
+    if let Some(value) = args.default_dry_run
+        && profile.policy.default_dry_run != value
+    {
+        profile.policy.default_dry_run = value;
+        changed.push("default_dry_run".to_owned());
+    }
+    if let Some(value) = args.allow_destructive
+        && profile.policy.allow_destructive != value
+    {
+        profile.policy.allow_destructive = value;
+        changed.push("allow_destructive".to_owned());
+    }
+    if let Some(value) = args.allow_public_shares
+        && profile.policy.allow_public_shares != value
+    {
+        profile.policy.allow_public_shares = value;
+        changed.push("allow_public_shares".to_owned());
+    }
+
+    Ok(changed)
 }
 
 async fn handle_auth(
@@ -895,6 +995,32 @@ struct ProfileListItem {
     username: String,
     is_default: bool,
     agent_mode: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ProfilePolicyOutput {
+    profile: String,
+    server: String,
+    policy: nextcloud::ProfilePolicy,
+    updated: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ProfilePolicySetOutput {
+    profile: String,
+    server: String,
+    policy: nextcloud::ProfilePolicy,
+    updated: bool,
+    changed: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ProfilePolicyResetOutput {
+    profile: String,
+    server: String,
+    policy: nextcloud::ProfilePolicy,
+    updated: bool,
+    reset: bool,
 }
 
 #[derive(Debug, Serialize)]

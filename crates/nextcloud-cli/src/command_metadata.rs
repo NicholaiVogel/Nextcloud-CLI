@@ -63,6 +63,21 @@ pub fn command_schema() -> CommandSchema {
                 "ProfileDefaultResult",
             ),
             stable(
+                "profiles policy show",
+                "Show local safety policy for one configured profile.",
+                "ProfilePolicy",
+            ),
+            stable(
+                "profiles policy set",
+                "Update local safety policy for one configured profile.",
+                "ProfilePolicySetResult",
+            ),
+            stable(
+                "profiles policy reset",
+                "Reset local safety policy for one configured profile to defaults.",
+                "ProfilePolicyResetResult",
+            ),
+            stable(
                 "server status",
                 "Fetch Nextcloud status.php for the selected profile.",
                 "ServerStatus",

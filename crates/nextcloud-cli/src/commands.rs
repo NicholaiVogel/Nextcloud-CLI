@@ -77,11 +77,45 @@ pub enum ProfilesCommand {
     List,
     Show(ProfileNameArgs),
     SetDefault(ProfileNameArgs),
+    #[command(subcommand)]
+    Policy(ProfilePolicyCommand),
 }
 
 #[derive(Debug, Args)]
 pub struct ProfileNameArgs {
     pub name: String,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProfilePolicyCommand {
+    Show(ProfileNameArgs),
+    Set(ProfilePolicySetArgs),
+    Reset(ProfilePolicyResetArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ProfilePolicySetArgs {
+    pub name: String,
+
+    #[arg(long)]
+    pub agent_mode: Option<bool>,
+
+    #[arg(long)]
+    pub default_dry_run: Option<bool>,
+
+    #[arg(long)]
+    pub allow_destructive: Option<bool>,
+
+    #[arg(long)]
+    pub allow_public_shares: Option<bool>,
+}
+
+#[derive(Debug, Args)]
+pub struct ProfilePolicyResetArgs {
+    pub name: String,
+
+    #[arg(long, default_value_t = false)]
+    pub yes: bool,
 }
 
 #[derive(Debug, Subcommand)]

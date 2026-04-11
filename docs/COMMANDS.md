@@ -20,6 +20,9 @@ detection, core WebDAV file-transfer commands, and initial OCS share listing:
 - `profiles list`
 - `profiles show <name>`
 - `profiles set-default <name>`
+- `profiles policy show <name>`
+- `profiles policy set <name> [--agent-mode true|false] [--default-dry-run true|false] [--allow-destructive true|false] [--allow-public-shares true|false]`
+- `profiles policy reset <name> --yes`
 - `server status`
 - `server capabilities [--refresh]`
 - `files list [path]`

@@ -2453,6 +2453,17 @@ Minimum `policy set` flags:
 --require-yes-for-sensitive true|false
 ```
 
+Implementation status:
+
+- `profiles policy show <profile>` is implemented.
+- `profiles policy set <profile>` is implemented for the currently persisted
+  policy fields: `--agent-mode true|false`, `--default-dry-run true|false`,
+  `--allow-destructive true|false`, and `--allow-public-shares true|false`.
+- `profiles policy reset <profile> --yes` is implemented and resets to current
+  safe defaults.
+- The broader allow/deny command, path, size-limit, content-search, snippet, and
+  strict-mode policy surface remains planned.
+
 Command families:
 
 ```text
@@ -2586,7 +2597,7 @@ creating public shares unless the user explicitly asked for it.
 
 Per-profile policy is complete only when:
 
-- policy show/set/reset commands exist
+- policy show/set/reset commands exist for the current persisted policy fields
 - new profiles get safe agent defaults
 - `--agent` and `NEXTCLOUD_CLI_AGENT_MODE` activate agent behavior
 - command safety classes drive policy checks
@@ -5251,7 +5262,8 @@ Deliverables:
 - `shares delete` / `shares revoke`: implemented with dry-run and guarded actual
   execution
 - destructive action confirmation model
-- first version of per-profile policy enforcement
+- first version of per-profile policy enforcement: implemented for public share
+  creation, with policy show/set/reset commands
 - audit event shape for writes
 
 Completion signal:

@@ -57,6 +57,9 @@ pub enum CliError {
     #[error("invalid share id `{value}`; share id must not be empty")]
     InvalidShareId { value: String },
 
+    #[error("policy set did not include any changes")]
+    NoPolicyChanges,
+
     #[error("failed to read credentials from {path}: {source}")]
     CredentialRead {
         path: PathBuf,
@@ -130,6 +133,7 @@ impl CliError {
             Self::UnsupportedShareCreateMode => "unsupported_share_create_mode",
             Self::InvalidExpireDate { .. } => "invalid_expire_date",
             Self::InvalidShareId { .. } => "invalid_share_id",
+            Self::NoPolicyChanges => "no_policy_changes",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
             Self::CredentialParse { .. } => "credential_parse_failed",
@@ -162,6 +166,7 @@ impl CliError {
             Self::UnsupportedShareCreateMode => 2,
             Self::InvalidExpireDate { .. } => 2,
             Self::InvalidShareId { .. } => 2,
+            Self::NoPolicyChanges => 2,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::OcsStatus { .. }) => 6,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,

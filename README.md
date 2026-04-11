@@ -190,7 +190,7 @@ Current commands:
 | Metadata | `commands schema` |
 | Config | `config path`, `config show`, `config doctor` |
 | Auth | `auth login`, `auth app-password`, `auth add`, `auth status` |
-| Profiles | `profiles list`, `profiles show <name>`, `profiles set-default <name>` |
+| Profiles | `profiles list`, `profiles show <name>`, `profiles set-default <name>`, `profiles policy show/set/reset` |
 | Server | `server status`, `server capabilities [--refresh]` |
 | Files | `files list`, `files search`, `files stat`, `files mkdir`, `files upload`, `files download`, `files delete` |
 | Shares | `shares list`, `shares create --public`, `shares delete`, `shares revoke` |
@@ -364,6 +364,24 @@ Implemented environment variables:
 
 `auth app-password --password-env <NAME>` can read the account password from
 any environment variable name you provide.
+
+## Profile policy
+
+Profiles carry local safety policy. This is separate from Nextcloud server
+permissions and exists so scripts and agents can have a smaller blast radius.
+
+```bash
+nxc profiles policy show personal
+nxc profiles policy set personal --allow-public-shares true
+nxc profiles policy reset personal --yes
+```
+
+The first implemented policy fields are:
+
+- `agent_mode`
+- `default_dry_run`
+- `allow_destructive`
+- `allow_public_shares`
 
 Additional environment variables are specified in
 [`docs/SPEC.md`](docs/SPEC.md) and will be documented here as they are
