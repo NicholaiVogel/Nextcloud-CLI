@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://nextcloud.com/c/uploads/2025/10/Nextcloud_02-blue-logo.svg" alt="Nextcloud" height="48" align="center" />
+  <img src="https://nextcloud.com/c/uploads/2025/10/Nextcloud-logo-blue.png?original" alt="Nextcloud" height="48" align="center" />
   &nbsp;nxc
 </h1>
 
@@ -440,7 +440,10 @@ commands, release binaries, npm, a curl installer, Homebrew, and agent skills.
 - [`docs/NETWORK.md`](docs/NETWORK.md), network, proxy, and TLS behavior
 - [`docs/SMOKE.md`](docs/SMOKE.md), manual smoke testing
 - [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md), real-server compatibility
+- [`CONTRIBUTING.md`](CONTRIBUTING.md), contribution guidelines
+- [`SECURITY.md`](SECURITY.md), vulnerability reporting
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md), community standards
 
 ## License
 
-MIT
+MIT. See [`LICENSE`](LICENSE).
