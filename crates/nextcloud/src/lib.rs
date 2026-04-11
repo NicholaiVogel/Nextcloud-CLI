@@ -19,7 +19,7 @@ pub use auth::{
     AppPasswordClient, AppPasswordCredentials, LoginFlowV2Client, LoginFlowV2Credentials,
     LoginFlowV2Poll, LoginFlowV2Start,
 };
-pub use calendar::{CalendarClient, CalendarEvent, CalendarEventsOptions};
+pub use calendar::{CalendarClient, CalendarCreateOptions, CalendarEvent, CalendarEventsOptions};
 pub use capabilities::{CapabilitiesClient, ServerCapabilities, ServerStatus};
 pub use client::{ClientAuth, DownloadedBytes, NextcloudClient};
 pub use config_schema::{

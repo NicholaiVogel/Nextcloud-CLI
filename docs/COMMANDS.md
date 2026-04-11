@@ -37,5 +37,6 @@ detection, core WebDAV file-transfer commands, and initial OCS share listing:
 - `shares delete <share-id> [--dry-run] [--yes]`
 - `shares revoke <share-id> [--dry-run] [--yes]`
 - `calendar events [--date today|<yyyy-mm-dd>] [--range <days>d] [--from <date-or-rfc3339>] [--to <date-or-rfc3339>] [--calendar <name>]`
+- `calendar create --calendar <name> --summary <text> --starts-at <date-or-rfc3339> --ends-at <date-or-rfc3339> [--location <text>] [--description <text>] [--all-day] [--dry-run]`
 - `contacts search <query> [--limit <n>] [--addressbook <name>]`
 - `update check`

@@ -1078,7 +1078,121 @@ async fn handle_calendar(
                 count,
             })
         }
+        CalendarCommand::Create(args) => {
+            let event = build_calendar_create_options(&args)?;
+            if args.dry_run {
+                record(
+                    store.paths(),
+                    &command_executed(
+                        &profile.name,
+                        profile.server.as_str(),
+                        "calendar.create",
+                        true,
+                        "PUT",
+                        "/remote.php/dav/calendars/{username}/{calendar}/{uid}.ics",
+                        target([
+                            ("calendar", json!(event.calendar.clone())),
+                            ("uid", json!(event.uid.clone())),
+                            ("summary", json!(event.summary.clone())),
+                            ("all_day", json!(event.all_day)),
+                        ]),
+                    ),
+                );
+                return json_value(CalendarCreateOutput {
+                    profile: profile.name,
+                    server: profile.server.to_string(),
+                    dry_run: true,
+                    created: false,
+                    event: CalendarCreatePreview {
+                        uid: event.uid,
+                        calendar: event.calendar,
+                        summary: event.summary,
+                        starts_at: event.starts_at,
+                        ends_at: event.ends_at,
+                        all_day: event.all_day,
+                        location: event.location,
+                        description_present: event.description.is_some(),
+                    },
+                });
+            }
+
+            let created = calendar.create_event(&event).await?;
+            record(
+                store.paths(),
+                &command_executed(
+                    &profile.name,
+                    profile.server.as_str(),
+                    "calendar.create",
+                    false,
+                    "PUT",
+                    "/remote.php/dav/calendars/{username}/{calendar}/{uid}.ics",
+                    target([
+                        ("calendar", json!(event.calendar.clone())),
+                        ("uid", json!(event.uid.clone())),
+                        ("summary", json!(event.summary.clone())),
+                        ("all_day", json!(event.all_day)),
+                    ]),
+                ),
+            );
+            json_value(json!({
+                "profile": profile.name,
+                "server": profile.server.to_string(),
+                "dry_run": false,
+                "created": true,
+                "event": created,
+            }))
+        }
     }
+}
+
+fn build_calendar_create_options(
+    args: &commands::CalendarCreateArgs,
+) -> CliResult<nextcloud::CalendarCreateOptions> {
+    let uid = format!(
+        "nextcloud-cli-{}-{}",
+        std::process::id(),
+        Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    );
+
+    if args.all_day {
+        let starts = parse_calendar_date_only(&args.starts_at)?;
+        let ends = parse_calendar_date_only(&args.ends_at)?;
+        if ends <= starts {
+            return Err(CliError::InvalidCalendarEventRange);
+        }
+        return Ok(nextcloud::CalendarCreateOptions {
+            calendar: args.calendar.clone(),
+            uid,
+            summary: args.summary.clone(),
+            starts_at: starts.to_string(),
+            ends_at: ends.to_string(),
+            location: args.location.clone(),
+            description: args.description.clone(),
+            all_day: true,
+        });
+    }
+
+    let starts = parse_calendar_bound(&args.starts_at)?;
+    let ends = parse_calendar_bound(&args.ends_at)?;
+    if ends <= starts {
+        return Err(CliError::InvalidCalendarEventRange);
+    }
+    Ok(nextcloud::CalendarCreateOptions {
+        calendar: args.calendar.clone(),
+        uid,
+        summary: args.summary.clone(),
+        starts_at: starts.to_rfc3339(),
+        ends_at: ends.to_rfc3339(),
+        location: args.location.clone(),
+        description: args.description.clone(),
+        all_day: false,
+    })
+}
+
+fn parse_calendar_date_only(value: &str) -> CliResult<NaiveDate> {
+    NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| CliError::InvalidCalendarBound {
+        value: value.to_owned(),
+    })
 }
 
 async fn handle_contacts(
@@ -1458,6 +1572,27 @@ struct CalendarEventsOutput {
     range: CalendarRangeOutput,
     events: Vec<nextcloud::CalendarEvent>,
     count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct CalendarCreateOutput {
+    profile: String,
+    server: String,
+    dry_run: bool,
+    created: bool,
+    event: CalendarCreatePreview,
+}
+
+#[derive(Debug, Serialize)]
+struct CalendarCreatePreview {
+    uid: String,
+    calendar: String,
+    summary: String,
+    starts_at: String,
+    ends_at: String,
+    all_day: bool,
+    location: Option<String>,
+    description_present: bool,
 }
 
 #[derive(Debug, Serialize)]

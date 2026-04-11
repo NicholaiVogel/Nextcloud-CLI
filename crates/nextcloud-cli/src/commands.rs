@@ -334,6 +334,7 @@ pub struct SharesDeleteArgs {
 #[derive(Debug, Subcommand)]
 pub enum CalendarCommand {
     Events(CalendarEventsArgs),
+    Create(CalendarCreateArgs),
 }
 
 #[derive(Debug, Args)]
@@ -352,6 +353,33 @@ pub struct CalendarEventsArgs {
 
     #[arg(long)]
     pub calendar: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct CalendarCreateArgs {
+    #[arg(long)]
+    pub calendar: String,
+
+    #[arg(long)]
+    pub summary: String,
+
+    #[arg(long)]
+    pub starts_at: String,
+
+    #[arg(long)]
+    pub ends_at: String,
+
+    #[arg(long)]
+    pub location: Option<String>,
+
+    #[arg(long)]
+    pub description: Option<String>,
+
+    #[arg(long, default_value_t = false)]
+    pub all_day: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Subcommand)]

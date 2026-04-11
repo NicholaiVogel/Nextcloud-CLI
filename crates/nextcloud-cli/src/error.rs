@@ -69,6 +69,9 @@ pub enum CliError {
     #[error("invalid limit `{value}`; expected a value from 1 to 100")]
     InvalidLimit { value: u32 },
 
+    #[error("calendar event end must be after start")]
+    InvalidCalendarEventRange,
+
     #[error("failed to read credentials from {path}: {source}")]
     CredentialRead {
         path: PathBuf,
@@ -146,6 +149,7 @@ impl CliError {
             Self::InvalidCalendarRange { .. } => "invalid_calendar_range",
             Self::InvalidCalendarBound { .. } => "invalid_calendar_bound",
             Self::InvalidLimit { .. } => "invalid_limit",
+            Self::InvalidCalendarEventRange => "invalid_calendar_event_range",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
             Self::CredentialParse { .. } => "credential_parse_failed",
@@ -182,6 +186,7 @@ impl CliError {
             Self::InvalidCalendarRange { .. } => 2,
             Self::InvalidCalendarBound { .. } => 2,
             Self::InvalidLimit { .. } => 2,
+            Self::InvalidCalendarEventRange => 2,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::OcsStatus { .. }) => 6,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,

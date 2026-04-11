@@ -50,6 +50,35 @@ impl CalendarClient {
         Ok(events)
     }
 
+    pub async fn create_event(&self, options: &CalendarCreateOptions) -> Result<CalendarEvent> {
+        let uid = options.uid.clone();
+        let ical = build_ical_event(options);
+        let path = self.event_path(&options.calendar, &uid);
+        let etag = self
+            .client
+            .put_bytes(
+                &path,
+                ical.into_bytes(),
+                Some("text/calendar; charset=utf-8"),
+            )
+            .await?;
+
+        Ok(CalendarEvent {
+            uid,
+            calendar: options.calendar.clone(),
+            calendar_display_name: None,
+            summary: Some(options.summary.clone()),
+            description: options.description.clone(),
+            location: options.location.clone(),
+            starts_at: Some(options.starts_at.clone()),
+            ends_at: Some(options.ends_at.clone()),
+            all_day: options.all_day,
+            status: Some("CONFIRMED".to_owned()),
+            href: Some(format!("/{}", path)),
+            etag,
+        })
+    }
+
     async fn discover_calendars(&self) -> Result<Vec<CalendarRef>> {
         let body = r#"<?xml version="1.0" encoding="UTF-8"?>
 <d:propfind xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
@@ -83,6 +112,15 @@ impl CalendarClient {
             encode_segment(calendar)
         )
     }
+
+    fn event_path(&self, calendar: &str, uid: &str) -> String {
+        format!(
+            "remote.php/dav/calendars/{}/{}/{}.ics",
+            encode_segment(&self.username),
+            encode_segment(calendar),
+            encode_segment(uid)
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,6 +128,18 @@ pub struct CalendarEventsOptions {
     pub from: DateTime<Utc>,
     pub to: DateTime<Utc>,
     pub calendar: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CalendarCreateOptions {
+    pub calendar: String,
+    pub uid: String,
+    pub summary: String,
+    pub starts_at: String,
+    pub ends_at: String,
+    pub location: Option<String>,
+    pub description: Option<String>,
+    pub all_day: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -445,6 +495,56 @@ fn build_calendar_query(from: DateTime<Utc>, to: DateTime<Utc>) -> String {
     )
 }
 
+pub fn build_ical_event(options: &CalendarCreateOptions) -> String {
+    let mut lines = vec![
+        "BEGIN:VCALENDAR".to_owned(),
+        "VERSION:2.0".to_owned(),
+        "PRODID:-//nextcloud-cli//EN".to_owned(),
+        "BEGIN:VEVENT".to_owned(),
+        format!("UID:{}", escape_ical_text(&options.uid)),
+        format!("SUMMARY:{}", escape_ical_text(&options.summary)),
+        "STATUS:CONFIRMED".to_owned(),
+    ];
+
+    if options.all_day {
+        lines.push(format!("DTSTART;VALUE=DATE:{}", options.starts_at));
+        lines.push(format!("DTEND;VALUE=DATE:{}", options.ends_at));
+    } else {
+        lines.push(format!(
+            "DTSTART:{}",
+            rfc3339_to_ical_utc(&options.starts_at)
+        ));
+        lines.push(format!("DTEND:{}", rfc3339_to_ical_utc(&options.ends_at)));
+    }
+
+    if let Some(location) = &options.location {
+        lines.push(format!("LOCATION:{}", escape_ical_text(location)));
+    }
+    if let Some(description) = &options.description {
+        lines.push(format!("DESCRIPTION:{}", escape_ical_text(description)));
+    }
+
+    lines.push("END:VEVENT".to_owned());
+    lines.push("END:VCALENDAR".to_owned());
+    format!("{}\r\n", lines.join("\r\n"))
+}
+
+fn rfc3339_to_ical_utc(value: &str) -> String {
+    DateTime::parse_from_rfc3339(value)
+        .map(|value| value.with_timezone(&Utc))
+        .unwrap_or_else(|_| Utc::now())
+        .format("%Y%m%dT%H%M%SZ")
+        .to_string()
+}
+
+fn escape_ical_text(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace(';', "\\;")
+        .replace(',', "\\,")
+}
+
 fn encode_segment(segment: &str) -> String {
     percent_encoding::utf8_percent_encode(segment, PATH_SEGMENT_ENCODE_SET).to_string()
 }
@@ -543,5 +643,25 @@ END:VCALENDAR</cal:calendar-data>
         );
         assert_eq!(events[0].etag.as_deref(), Some("abc"));
         Ok(())
+    }
+
+    #[test]
+    fn serializes_ical_event() {
+        let ical = build_ical_event(&CalendarCreateOptions {
+            calendar: "personal".to_owned(),
+            uid: "event-1".to_owned(),
+            summary: "Meet, plan".to_owned(),
+            starts_at: "2026-04-10T16:00:00Z".to_owned(),
+            ends_at: "2026-04-10T17:00:00Z".to_owned(),
+            location: Some("Office".to_owned()),
+            description: Some("Bring notes".to_owned()),
+            all_day: false,
+        });
+
+        assert!(ical.contains("BEGIN:VCALENDAR"));
+        assert!(ical.contains("SUMMARY:Meet\\, plan"));
+        assert!(ical.contains("DTSTART:20260410T160000Z"));
+        assert!(ical.contains("DTEND:20260410T170000Z"));
+        assert!(ical.contains("LOCATION:Office"));
     }
 }

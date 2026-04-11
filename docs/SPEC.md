@@ -1629,6 +1629,9 @@ Behavior:
 - Use explicit timezone handling.
 - Support `--dry-run` by printing the target href and redacted iCalendar preview.
 - Return normalized event metadata including href and ETag when available.
+- Status: initial implementation exists for dry-run previews and actual CalDAV
+  PUT creation. Dry-run output reports whether a description was supplied without
+  echoing the description body.
 
 Expected output:
 
@@ -5292,6 +5295,7 @@ Deliverables:
 - iCalendar parsing: initial VEVENT parser implemented for read-only event
   listing
 - calendar create/update/delete with dry-run and ETag behavior
+- calendar create: initial implementation exists
 - CardDAV discovery and search
 - vCard parsing: initial parser implemented for read-only contact search
 - contacts create/update/delete with dry-run and ETag behavior

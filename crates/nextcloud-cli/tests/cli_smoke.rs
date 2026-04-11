@@ -719,6 +719,110 @@ fn calendar_events_rejects_bad_range_before_auth() -> Result<(), Box<dyn std::er
 }
 
 #[test]
+fn calendar_create_dry_run_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "calendar",
+            "create",
+            "--calendar",
+            "personal",
+            "--summary",
+            "Test",
+            "--starts-at",
+            "2026-04-10T16:00:00Z",
+            "--ends-at",
+            "2026-04-10T17:00:00Z",
+            "--description",
+            "private details",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dry_run\": true"))
+        .stdout(predicate::str::contains("\"created\": false"))
+        .stdout(predicate::str::contains("\"description_present\": true"))
+        .stdout(predicate::str::contains("private details").not());
+
+    Ok(())
+}
+
+#[test]
+fn calendar_create_rejects_inverted_range() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "calendar",
+            "create",
+            "--calendar",
+            "personal",
+            "--summary",
+            "Test",
+            "--starts-at",
+            "2026-04-10T17:00:00Z",
+            "--ends-at",
+            "2026-04-10T16:00:00Z",
+            "--dry-run",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("invalid_calendar_event_range"));
+
+    Ok(())
+}
+
+#[test]
 fn contacts_search_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
     Command::cargo_bin("nextcloud-cli")?
         .args(["contacts", "search", "--help"])

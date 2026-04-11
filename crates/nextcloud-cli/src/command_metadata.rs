@@ -148,6 +148,11 @@ pub fn command_schema() -> CommandSchema {
                 "CalendarEventsResult",
             ),
             stable(
+                "calendar create",
+                "Create a calendar event through CalDAV PUT, with dry-run support.",
+                "CalendarCreateResult",
+            ),
+            stable(
                 "contacts search",
                 "Search contacts through CardDAV addressbook-query.",
                 "ContactsSearchResult",
