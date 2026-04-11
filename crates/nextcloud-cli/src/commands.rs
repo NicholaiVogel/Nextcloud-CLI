@@ -490,12 +490,22 @@ pub struct NotesListArgs {
 #[derive(Debug, Subcommand)]
 pub enum DeckCommand {
     Boards(DeckBoardsArgs),
+    Cards(DeckCardsArgs),
 }
 
 #[derive(Debug, Args)]
 pub struct DeckBoardsArgs {
     #[arg(long, default_value_t = false)]
     pub details: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct DeckCardsArgs {
+    #[arg(long)]
+    pub board: String,
+
+    #[arg(long, default_value_t = false)]
+    pub include_archived: bool,
 }
 
 #[derive(Debug, Subcommand)]

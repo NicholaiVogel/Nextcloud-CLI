@@ -198,7 +198,7 @@ Current commands:
 | Contacts | `contacts search`, `contacts create`, `contacts delete` |
 | Activity | `activity recent` |
 | Notes | `notes list` |
-| Deck | `deck boards` |
+| Deck | `deck boards`, `deck cards` |
 | Updates | `update check` |
 
 See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the implemented command list and

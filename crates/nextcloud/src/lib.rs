@@ -30,7 +30,7 @@ pub use config_schema::{
     CliConfig, ConfigPaths, ConfigStore, CredentialRef, Profile, ProfilePolicy,
 };
 pub use contacts::{Contact, ContactCreateOptions, ContactSearchOptions, ContactsClient};
-pub use deck::{DeckBoard, DeckClient};
+pub use deck::{DeckBoard, DeckCard, DeckCardsOptions, DeckClient};
 pub use error::{Error, Result};
 pub use notes::{Note, NotesClient, NotesListOptions};
 pub use ocs::{OcsEnvelope, OcsMeta};

@@ -45,4 +45,5 @@ detection, core WebDAV file-transfer commands, and initial OCS share listing:
 - `activity recent [--limit <n>]`
 - `notes list [--category <name>] [--exclude-content] [--limit <n>]`
 - `deck boards [--details]`
+- `deck cards --board <id> [--include-archived]`
 - `update check`

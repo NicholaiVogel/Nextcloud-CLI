@@ -188,6 +188,11 @@ pub fn command_schema() -> CommandSchema {
                 "DeckBoardsResult",
             ),
             stable(
+                "deck cards",
+                "List cards for a Deck board by flattening stack card arrays.",
+                "DeckCardsResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

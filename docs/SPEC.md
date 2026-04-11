@@ -2067,6 +2067,9 @@ Behavior:
 - Flatten stack card arrays into one `cards` list.
 - Preserve stack id and stack title on each card.
 - Exclude archived/deleted cards unless `--include-archived` is set.
+- If Deck is unavailable, return `app_unavailable` with source `deck`.
+- Status: `deck cards --board <id> [--include-archived]` is implemented for
+  the Deck stacks endpoint, flattened into card output.
 
 Expected output:
 
@@ -5328,7 +5331,8 @@ nextcloud-cli calendar create --calendar personal --summary Test --starts-at 202
 Deliverables:
 
 - Notes read/write commands: `notes list` implemented
-- Deck board, stack, and card commands: `deck boards` implemented
+- Deck board, stack, and card commands: `deck boards` and `deck cards`
+  implemented for read-only board/card listing
 - Activity feed command: implemented for `activity recent --limit <n>`
 - optional app unavailable mapping
 - smoke report fields for enabled and unavailable apps
@@ -5338,6 +5342,7 @@ Completion signal:
 ```bash
 nextcloud-cli notes list --exclude-content --format json
 nextcloud-cli deck boards --format json
+nextcloud-cli deck cards --board 1 --format json
 nextcloud-cli activity recent --limit 20 --format json
 ```
 

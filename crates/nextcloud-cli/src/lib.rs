@@ -1580,6 +1580,33 @@ async fn handle_deck(
                 count,
             })
         }
+        DeckCommand::Cards(args) => {
+            let cards = match deck
+                .cards(&nextcloud::DeckCardsOptions {
+                    board_id: args.board.clone(),
+                    include_archived: args.include_archived,
+                })
+                .await
+            {
+                Ok(cards) => cards,
+                Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
+                    return Err(CliError::AppUnavailable {
+                        app: "deck".to_owned(),
+                        api_source: "deck".to_owned(),
+                    });
+                }
+                Err(error) => return Err(error.into()),
+            };
+            let count = cards.len();
+            json_value(DeckCardsOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                board_id: args.board,
+                include_archived: args.include_archived,
+                cards,
+                count,
+            })
+        }
     }
 }
 
@@ -2002,6 +2029,16 @@ struct DeckBoardsOutput {
     server: String,
     details: bool,
     boards: Vec<nextcloud::DeckBoard>,
+    count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckCardsOutput {
+    profile: String,
+    server: String,
+    board_id: String,
+    include_archived: bool,
+    cards: Vec<nextcloud::DeckCard>,
     count: usize,
 }
 

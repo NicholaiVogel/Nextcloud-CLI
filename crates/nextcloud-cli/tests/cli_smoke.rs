@@ -1160,6 +1160,18 @@ fn deck_boards_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn deck_cards_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    Command::cargo_bin("nextcloud-cli")?
+        .args(["deck", "cards", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--board"))
+        .stdout(predicate::str::contains("--include-archived"));
+
+    Ok(())
+}
+
+#[test]
 fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
 
