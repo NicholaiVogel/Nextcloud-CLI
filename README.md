@@ -77,9 +77,10 @@ The canonical product contract lives in [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Install from source
 
-Release binaries are produced for tagged releases. The npm wrapper, Homebrew
-tap, and curl installer are still planned. For active development, install from
-source:
+Release binaries are produced for tagged releases. The npm wrapper is
+implemented locally and will be publishable after the first matching GitHub
+release exists. The Homebrew tap and curl installer are still planned. For
+active development, install from source:
 
 ```bash
 git clone https://github.com/NicholaiVogel/Nextcloud-CLI.git

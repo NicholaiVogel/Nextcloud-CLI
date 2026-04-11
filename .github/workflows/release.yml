@@ -16,19 +16,15 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            archive: tar.gz
           - os: macos-latest
-            archive: tar.gz
           - os: windows-latest
-            archive: zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Build
         run: cargo build --profile dist --locked -p nextcloud-cli
-      - name: Package Unix artifact
-        if: matrix.archive == 'tar.gz'
+      - name: Package release artifact
         shell: bash
         run: |
           set -euo pipefail
@@ -36,8 +32,13 @@ jobs:
           host="$(rustc -vV | awk '/host:/ { print $2 }')"
           name="nextcloud-cli-${version}-${host}"
           mkdir -p "dist/${name}"
-          cp target/dist/nextcloud-cli "dist/${name}/nextcloud-cli"
-          cp target/dist/nxc "dist/${name}/nxc"
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            cp target/dist/nextcloud-cli.exe "dist/${name}/nextcloud-cli.exe"
+            cp target/dist/nxc.exe "dist/${name}/nxc.exe"
+          else
+            cp target/dist/nextcloud-cli "dist/${name}/nextcloud-cli"
+            cp target/dist/nxc "dist/${name}/nxc"
+          fi
           cp README.md LICENSE "dist/${name}/"
           tar -C dist -czf "dist/${name}.tar.gz" "${name}"
           if command -v sha256sum >/dev/null 2>&1; then
@@ -45,26 +46,9 @@ jobs:
           else
             (cd dist && shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256")
           fi
-      - name: Package Windows artifact
-        if: matrix.archive == 'zip'
-        shell: pwsh
-        run: |
-          $Version = $env:GITHUB_REF_NAME.TrimStart("v")
-          $HostTriple = (rustc -vV | Select-String "^host:").ToString().Split(" ")[1]
-          $Name = "nextcloud-cli-$Version-$HostTriple"
-          New-Item -ItemType Directory -Force -Path "dist/$Name" | Out-Null
-          Copy-Item "target/dist/nextcloud-cli.exe" "dist/$Name/nextcloud-cli.exe"
-          Copy-Item "target/dist/nxc.exe" "dist/$Name/nxc.exe"
-          Copy-Item "README.md" "dist/$Name/README.md"
-          Copy-Item "LICENSE" "dist/$Name/LICENSE"
-          Compress-Archive -Path "dist/$Name/*" -DestinationPath "dist/$Name.zip"
-          $Hash = Get-FileHash "dist/$Name.zip" -Algorithm SHA256
-          "$($Hash.Hash.ToLower())  $Name.zip" | Out-File -Encoding ascii "dist/$Name.zip.sha256"
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.tar.gz
             dist/*.tar.gz.sha256
-            dist/*.zip
-            dist/*.zip.sha256

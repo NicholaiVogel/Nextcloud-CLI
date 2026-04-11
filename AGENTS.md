@@ -30,6 +30,15 @@ convenience hacks.
    git diff --check
    ```
 
+   When touching the npm wrapper, also run:
+
+   ```bash
+   cd npm/nextcloud-cli
+   NEXTCLOUD_CLI_SKIP_DOWNLOAD=1 npm ci
+   npm test
+   npm pack --dry-run
+   ```
+
 5. When safe and relevant, run a real smoke test against the configured
    Nextcloud profile. Only touch clearly named smoke-test artifacts.
 
@@ -77,8 +86,9 @@ convenience hacks.
 - Phase 6: distribution and agent experience, partially implemented. README,
   command metadata, CI, `nxc` alias, tagged GitHub release packaging, and
   placeholder `update check` exist. `smoke run` exists for safe redacted
-  live-server health reports. npm wrapper, curl installer, real self-update, and
-  agent skills remain planned.
+  live-server health reports. The npm wrapper exists under `npm/nextcloud-cli`
+  but is not published yet. curl installer, real self-update, and agent skills
+  remain planned.
 
 When continuing autonomously, complete the next smallest vertical slice,
 validate it, smoke it safely, commit it, push it, then update memory.

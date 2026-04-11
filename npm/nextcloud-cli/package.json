@@ -1,0 +1,44 @@
+{
+  "name": "nextcloud-cli",
+  "version": "0.1.0",
+  "description": "Unofficial client-side Nextcloud CLI for humans, scripts, and AI agents.",
+  "license": "MIT",
+  "homepage": "https://github.com/NicholaiVogel/Nextcloud-CLI#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NicholaiVogel/Nextcloud-CLI.git",
+    "directory": "npm/nextcloud-cli"
+  },
+  "bugs": {
+    "url": "https://github.com/NicholaiVogel/Nextcloud-CLI/issues"
+  },
+  "keywords": [
+    "nextcloud",
+    "cli",
+    "webdav",
+    "caldav",
+    "carddav",
+    "nxc"
+  ],
+  "bin": {
+    "nextcloud-cli": "bin/nextcloud-cli.js",
+    "nxc": "bin/nxc.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "scripts",
+    "vendor",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/install.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "tar": "^7.5.13"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

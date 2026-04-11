@@ -4738,7 +4738,7 @@ unreasonable during implementation:
 | `aarch64-unknown-linux-musl` | `.tar.gz` | `nextcloud-cli` |
 | `x86_64-unknown-linux-gnu` | `.tar.gz` | `nextcloud-cli` |
 | `x86_64-unknown-linux-musl` | `.tar.gz` | `nextcloud-cli` |
-| `x86_64-pc-windows-msvc` | `.zip` | `nextcloud-cli.exe` |
+| `x86_64-pc-windows-msvc` | `.tar.gz` | `nextcloud-cli.exe` |
 
 This mirrors the platform coverage of `references/cli`.
 
@@ -4757,13 +4757,13 @@ Each release must include:
 Archive naming:
 
 ```text
-nextcloud-cli-aarch64-apple-darwin.tar.gz
-nextcloud-cli-x86_64-apple-darwin.tar.gz
-nextcloud-cli-aarch64-unknown-linux-gnu.tar.gz
-nextcloud-cli-aarch64-unknown-linux-musl.tar.gz
-nextcloud-cli-x86_64-unknown-linux-gnu.tar.gz
-nextcloud-cli-x86_64-unknown-linux-musl.tar.gz
-nextcloud-cli-x86_64-pc-windows-msvc.zip
+nextcloud-cli-<version>-aarch64-apple-darwin.tar.gz
+nextcloud-cli-<version>-x86_64-apple-darwin.tar.gz
+nextcloud-cli-<version>-aarch64-unknown-linux-gnu.tar.gz
+nextcloud-cli-<version>-aarch64-unknown-linux-musl.tar.gz
+nextcloud-cli-<version>-x86_64-unknown-linux-gnu.tar.gz
+nextcloud-cli-<version>-x86_64-unknown-linux-musl.tar.gz
+nextcloud-cli-<version>-x86_64-pc-windows-msvc.tar.gz
 ```
 
 ### 37.6 npm package
@@ -4782,6 +4782,14 @@ owned by Nicholai's personal GitHub/npm account and document it explicitly. The
 CLI command names must remain `nextcloud-cli` and `nxc` regardless of package
 name.
 
+Status: initial npm wrapper package is implemented under `npm/nextcloud-cli`.
+It exposes `nextcloud-cli` and `nxc`, maps Node platforms to release triples,
+downloads `nextcloud-cli-<version>-<triple>.tar.gz`, verifies SHA-256, extracts
+to `vendor/<triple>/`, supports `NEXTCLOUD_CLI_SKIP_DOWNLOAD=1`, and supports
+`NEXTCLOUD_CLI_BINARY` for local development. The runner attempts one installer
+recovery if the vendor binary is missing. Publishing remains pending until a
+matching GitHub release exists.
+
 The npm package should contain:
 
 ```text
@@ -4799,7 +4807,7 @@ Required behavior:
 - `install.js` downloads the matching GitHub Release archive for the npm package
   version.
 - `install.js` downloads and verifies the `.sha256` file.
-- `install.js` extracts the binary into `npm/bin`.
+- `install.js` extracts the binary into `vendor/<triple>/`.
 - `run.js` executes the installed binary.
 - If the binary is missing, `run.js` attempts reinstall before failing.
 - Installer errors are sanitized and must not expose environment secrets.
@@ -5403,7 +5411,7 @@ Deliverables:
 
 - README quickstart: implemented for source/development workflow
 - install docs: partial, source install documented
-- npm wrapper: pending
+- npm wrapper: implemented locally under `npm/nextcloud-cli`, unpublished
 - curl installer: pending
 - GitHub Release artifact naming and checksum verification: implemented for
   tagged releases

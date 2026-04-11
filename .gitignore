@@ -1,5 +1,7 @@
 /target/
 /references/
+/npm/nextcloud-cli/node_modules/
+/npm/nextcloud-cli/vendor/
 .env
 .env.*
 !.env.example
