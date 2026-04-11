@@ -1,80 +1,144 @@
-<h1 align="center">NXC</h1>
+<h1 align="center">
+  <img src="https://nextcloud.com/c/uploads/2025/10/Nextcloud_02-blue-logo.svg" alt="Nextcloud" height="48" align="center" />
+  &nbsp;nxc
+</h1>
 
-Unofficial client-side CLI for Nextcloud, built for humans, shell scripts, and AI
-agents that need structured access to a user's cloud from outside the server.
+<p align="center">
+  <strong>Unofficial client-side CLI for Nextcloud.</strong>
+</p>
 
-`nextcloud-cli` talks to existing Nextcloud HTTP APIs and prints JSON by default.
-It is designed for local machines, SSH sessions, CI jobs, and agent runtimes
-where predictable output and safe credential handling matter.
+<p align="center">
+  Stable JSON output by default, secure credential storage, and commands for
+  humans, shell scripts, and AI agents.
+</p>
 
 > [!NOTE]
-> This is **not** an officially supported Nextcloud product.
+> This is not an officially supported Nextcloud product.
 
 > [!IMPORTANT]
-> This project is under active development. Expect breaking changes as we march toward v1.0.
+> This project is under active development. Expect breaking changes before v1.0.
 
+`nxc` talks to existing Nextcloud HTTP APIs from a local machine, SSH session,
+CI job, or agent runtime. It authenticates as a normal user and provides a
+scriptable handle on files today, with shares, calendars, contacts, Notes,
+Deck, Activity, and raw DAV/OCS commands planned in the spec.
+
+Both command names are supported:
+
+- `nxc`, short form
+- `nextcloud-cli`, explicit long form
+
+The examples below use `nxc`. Replace it with `nextcloud-cli` if you prefer the
+long command name.
+
+## Contents
+
+- [Status](#status)
+- [Install from source](#install-from-source)
+- [Quick start](#quick-start)
+- [Authentication](#authentication)
+- [Implemented commands](#implemented-commands)
+- [Credential handling](#credential-handling)
+- [Profile selection](#profile-selection)
+- [JSON output](#json-output)
+- [Common workflows](#common-workflows)
+- [Environment variables](#environment-variables)
+- [Exit codes](#exit-codes)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [Roadmap](#roadmap)
+- [Documentation](#documentation)
+- [License](#license)
 
 ## Status
 
-This project is in the first implementation pass. The current CLI can:
+The current implementation covers the repository spine, authentication,
+profiles, server status/capability checks, and the core WebDAV file surface.
 
-- authenticate with Nextcloud Login Flow v2
-- authenticate headlessly by minting an app password through OCS
-- store credentials in the operating-system keyring when available
-- fall back to an owner-only local credential file in headless environments
-- manage profiles
-- inspect server status and capabilities
-- list, search, stat, create, upload, download, and delete files through WebDAV
-- print machine-readable command metadata for agents
+Implemented today:
+
+- Login Flow v2 authentication with `auth login`
+- headless app-password minting with `auth app-password`
+- existing app-password registration with `auth add`
+- OS keyring storage with owner-only file fallback for headless environments
+- profile creation, listing, inspection, and default selection
+- server status and capabilities
+- WebDAV file list, name search, stat, mkdir, upload, streaming download, and delete
+- machine-readable command metadata with `commands schema`
 
 The canonical product contract lives in [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Install from source
 
+Release binaries, an npm wrapper, a Homebrew tap, and a curl installer are
+planned. For now, install from source:
+
 ```bash
 git clone https://github.com/NicholaiVogel/Nextcloud-CLI.git
 cd Nextcloud-CLI
-cargo build --workspace
+cargo install --path crates/nextcloud-cli --locked
 ```
 
-During development, run commands with:
+That installs both binaries:
 
 ```bash
+nxc --help
+nextcloud-cli --help
+```
+
+Run from a checkout without installing:
+
+```bash
+cargo run -p nextcloud-cli --bin nxc -- <command>
 cargo run -p nextcloud-cli -- <command>
-```
-
-The examples below use the installed command name. If you are working from
-source, replace `nextcloud-cli` with:
-
-```bash
-cargo run -p nextcloud-cli --
 ```
 
 ## Quick start
 
-### 1. Check local configuration
-
 ```bash
-nextcloud-cli config doctor
-nextcloud-cli config path
+nxc auth login \
+  --server https://cloud.example.com \
+  --profile personal
+
+nxc --profile personal server status
+nxc --profile personal files list /
 ```
 
-### 2. Authenticate
+That gives you a stored app password, a saved profile, and a JSON listing of
+your root folder.
 
-For a local desktop session, use Login Flow v2:
+## Authentication
+
+All authentication flows end with the same result: a Nextcloud app password
+stored through the credential backend. Account passwords are not written to
+`config.json` or normal command output.
+
+| Situation | Command |
+| --- | --- |
+| Local desktop with browser access | `auth login` |
+| SSH or headless server with account password available | `auth app-password` |
+| CI or existing app password | `auth add` |
+
+### Local desktop
 
 ```bash
-nextcloud-cli auth login \
+nxc auth login \
   --server https://cloud.example.com \
   --profile personal
 ```
 
-For SSH or other headless sessions, read the account password from stdin and
-store only the generated app password:
+`nxc` starts Nextcloud Login Flow v2, opens the approval URL in your browser,
+waits for approval, then stores the returned app password.
+
+### Headless or SSH
+
+Use `auth app-password` when there is no browser on the machine running the CLI.
+It reads the account password from stdin, mints an app password through OCS,
+then stores only the app password:
 
 ```bash
 read -rsp "Nextcloud password: " NC_PASSWORD; echo
-printf '%s' "$NC_PASSWORD" | nextcloud-cli auth app-password \
+printf '%s' "$NC_PASSWORD" | nxc auth app-password \
   --server https://cloud.example.com \
   --user you \
   --profile personal \
@@ -82,52 +146,39 @@ printf '%s' "$NC_PASSWORD" | nextcloud-cli auth app-password \
 unset NC_PASSWORD
 ```
 
-If you already have a Nextcloud app password:
+If a secret manager injects the account password as an environment variable,
+pass the variable name:
 
 ```bash
-NEXTCLOUD_APP_PASSWORD=... nextcloud-cli auth add \
+nxc auth app-password \
+  --server https://cloud.example.com \
+  --user you \
+  --profile personal \
+  --password-env NC_PASSWORD
+```
+
+### Existing app password
+
+```bash
+NEXTCLOUD_APP_PASSWORD=... nxc auth add \
   --server https://cloud.example.com \
   --user you \
   --profile personal
 ```
 
-### 3. Verify the profile
+### Verify authentication
 
 ```bash
-nextcloud-cli --profile personal auth status
-nextcloud-cli --profile personal server status
-nextcloud-cli --profile personal server capabilities --refresh
+nxc --profile personal auth status
+nxc --profile personal server capabilities --refresh
 ```
 
-### 4. Work with files
-
-```bash
-nextcloud-cli --profile personal files list /
-nextcloud-cli --profile personal files search report --path /
-nextcloud-cli --profile personal files stat /Documents/report.pdf
-```
-
-Create a folder and round-trip a file through the server:
-
-```bash
-nextcloud-cli --profile personal files mkdir /nextcloud-cli-smoke --parents
-nextcloud-cli --profile personal files upload ./summary.md /nextcloud-cli-smoke/summary.md
-nextcloud-cli --profile personal files download /nextcloud-cli-smoke/summary.md ./summary.downloaded.md
-```
-
-Delete requires explicit confirmation:
-
-```bash
-nextcloud-cli --profile personal files delete /nextcloud-cli-smoke --dry-run
-nextcloud-cli --profile personal files delete /nextcloud-cli-smoke --yes
-```
-
-## Implemented command surface
+## Implemented commands
 
 Generated command metadata is available from the CLI:
 
 ```bash
-nextcloud-cli commands schema --format json
+nxc commands schema --format json
 ```
 
 Current commands:
@@ -142,7 +193,7 @@ Current commands:
 | Files | `files list`, `files search`, `files stat`, `files mkdir`, `files upload`, `files download`, `files delete` |
 | Updates | `update check` |
 
-See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the current command list and
+See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the implemented command list and
 [`docs/SPEC.md`](docs/SPEC.md) for the full target surface.
 
 ## Credential handling
@@ -150,30 +201,30 @@ See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the current command list and
 `config.json` stores profile metadata only. App passwords are stored through the
 credential backend.
 
-By default, the CLI uses `keyring-auto`:
+By default, `nxc` uses `keyring-auto`:
 
-1. try the operating-system keyring
-2. fall back to an owner-only local credential file when no usable keyring is
-   available
+1. Try the operating-system keyring.
+2. Fall back to an owner-only local credential file when no usable keyring is
+   available.
 
 Force a backend when needed:
 
 ```bash
-NEXTCLOUD_CLI_KEYRING_BACKEND=keyring nextcloud-cli auth status
-NEXTCLOUD_CLI_KEYRING_BACKEND=file nextcloud-cli auth status
+NEXTCLOUD_CLI_KEYRING_BACKEND=keyring nxc auth status
+NEXTCLOUD_CLI_KEYRING_BACKEND=file nxc auth status
 ```
 
-The local file backend writes:
+The local file backend writes to:
 
 ```text
 $XDG_CONFIG_HOME/nextcloud-cli/credentials.json
 ```
 
-On Unix, that file is written with `0600` permissions.
+On Unix, that file is created with `0600` permissions.
 
 ## Profile selection
 
-Implemented commands select a profile in this order:
+Every implemented command resolves its profile in this order:
 
 1. `--profile <name>`
 2. `NEXTCLOUD_CLI_PROFILE`
@@ -182,15 +233,15 @@ Implemented commands select a profile in this order:
 Examples:
 
 ```bash
-nextcloud-cli --profile personal files list /
-NEXTCLOUD_CLI_PROFILE=personal nextcloud-cli files list /
-nextcloud-cli profiles set-default personal
+nxc --profile personal files list /
+NEXTCLOUD_CLI_PROFILE=personal nxc files list /
+nxc profiles set-default personal
 ```
 
 ## JSON output
 
-JSON is the default output format. Success responses are command-specific.
-Errors use a stable envelope:
+JSON is the default format. Success responses are command-specific. Errors use
+a stable envelope:
 
 ```json
 {
@@ -201,8 +252,149 @@ Errors use a stable envelope:
 }
 ```
 
-Write commands include the selected profile and server in their output so agents
-can confirm which account they touched.
+Write commands include the selected profile and server in their output so
+callers can confirm which account was touched.
+
+`--format human` exists, but currently prints the same structured output as
+JSON. Richer human formatting is planned.
+
+## Common workflows
+
+### Inspect files
+
+```bash
+nxc --profile personal files list /
+nxc --profile personal files stat /Documents/report.pdf
+nxc --profile personal files search report --path /
+```
+
+`files list` returns entries under `entries`:
+
+```bash
+nxc --profile personal files list / | jq '.entries[] | {path, name, size}'
+```
+
+`files search` returns matches under `files`:
+
+```bash
+nxc --profile personal files search report --path / | jq '.files[] | {path, name, size}'
+```
+
+### Round-trip a file
+
+```bash
+nxc --profile personal files mkdir /nextcloud-cli-smoke --parents
+nxc --profile personal files upload ./summary.md /nextcloud-cli-smoke/summary.md
+nxc --profile personal files download /nextcloud-cli-smoke/summary.md ./summary.downloaded.md
+```
+
+Downloads stream to a temporary file first, verify `Content-Length` when the
+server provides it, then rename into place after the write completes.
+
+### Delete safely
+
+```bash
+nxc --profile personal files delete /nextcloud-cli-smoke --dry-run
+nxc --profile personal files delete /nextcloud-cli-smoke --yes
+```
+
+Deletes reject the root path and require either `--dry-run` or `--yes`.
+
+### Generate command metadata
+
+```bash
+nxc commands schema --format json | jq '.commands[].name'
+```
+
+This is the main integration point for agents that need to discover available
+commands without parsing help text.
+
+## Environment variables
+
+Implemented environment variables:
+
+| Variable | Description |
+| --- | --- |
+| `NEXTCLOUD_CLI_PROFILE` | Default profile name when `--profile` is not passed. |
+| `NEXTCLOUD_CLI_CONFIG_DIR` | Override the config directory. |
+| `NEXTCLOUD_CLI_KEYRING_BACKEND` | `keyring`, `file`, or unset for automatic keyring with local-file fallback. |
+| `NEXTCLOUD_APP_PASSWORD` | Consumed by `auth add --app-password`. |
+
+`auth app-password --password-env <NAME>` can read the account password from
+any environment variable name you provide.
+
+Additional environment variables are specified in
+[`docs/SPEC.md`](docs/SPEC.md) and will be documented here as they are
+implemented.
+
+## Exit codes
+
+Implemented exit codes:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success. |
+| `1` | General error. |
+| `2` | CLI validation, profile selection, credential selection, path validation, or confirmation error. |
+| `3` | HTTP, authentication, or network request failure. |
+| `10` | Login Flow v2 timeout. |
+
+The spec defines a richer exit-code contract for future command families.
+
+## Troubleshooting
+
+### `confirmation_required` on delete
+
+Preview the delete or confirm it explicitly:
+
+```bash
+nxc --profile personal files delete /old-stuff --dry-run
+nxc --profile personal files delete /old-stuff --yes
+```
+
+### Keyring unavailable over SSH or in a container
+
+Force the owner-only file backend:
+
+```bash
+NEXTCLOUD_CLI_KEYRING_BACKEND=file nxc auth status
+```
+
+The local file backend stores app passwords at:
+
+```text
+$XDG_CONFIG_HOME/nextcloud-cli/credentials.json
+```
+
+### Login Flow v2 times out
+
+Re-run the login command and approve the browser prompt before the timeout:
+
+```bash
+nxc auth login --server https://cloud.example.com --profile personal
+```
+
+On a headless machine, use `auth app-password`.
+
+### No profile selected
+
+Pass a profile, set an environment default, or store a default profile:
+
+```bash
+nxc profiles list
+nxc --profile personal auth status
+NEXTCLOUD_CLI_PROFILE=personal nxc auth status
+nxc profiles set-default personal
+```
+
+### General diagnostics
+
+```bash
+nxc config doctor
+nxc config show
+nxc --profile personal auth status
+nxc --profile personal server status
+```
 
 ## Development
 
@@ -212,15 +404,15 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-Useful smoke commands:
+Useful smoke commands, with an authenticated profile:
 
 ```bash
-nextcloud-cli --profile personal server capabilities --refresh
-nextcloud-cli --profile personal files mkdir /nextcloud-cli-smoke --parents
-nextcloud-cli --profile personal files upload ./fixture.txt /nextcloud-cli-smoke/fixture.txt
-nextcloud-cli --profile personal files search fixture --path /nextcloud-cli-smoke
-nextcloud-cli --profile personal files download /nextcloud-cli-smoke/fixture.txt ./fixture.downloaded
-nextcloud-cli --profile personal files delete /nextcloud-cli-smoke --yes
+nxc --profile personal server capabilities --refresh
+nxc --profile personal files mkdir /nextcloud-cli-smoke --parents
+nxc --profile personal files upload ./fixture.txt /nextcloud-cli-smoke/fixture.txt
+nxc --profile personal files search fixture --path /nextcloud-cli-smoke
+nxc --profile personal files download /nextcloud-cli-smoke/fixture.txt ./fixture.downloaded
+nxc --profile personal files delete /nextcloud-cli-smoke --yes
 ```
 
 More detailed smoke instructions live in [`docs/SMOKE.md`](docs/SMOKE.md).
@@ -236,14 +428,16 @@ The next phase is sharing and safety policy:
 - per-profile policy enforcement
 - audit event shape for writes
 
-Later phases cover calendar, contacts, Notes, Deck, Activity, packaging, npm
-distribution, the installer, and agent skills.
+Later phases cover calendar, contacts, Notes, Deck, Activity, raw DAV/OCS
+commands, release binaries, npm, a curl installer, Homebrew, and agent skills.
 
 ## Documentation
 
 - [`docs/SPEC.md`](docs/SPEC.md), canonical product spec
 - [`docs/COMMANDS.md`](docs/COMMANDS.md), implemented command surface
 - [`docs/CONFIG.md`](docs/CONFIG.md), configuration and credential behavior
+- [`docs/INSTALL.md`](docs/INSTALL.md), installation notes
+- [`docs/NETWORK.md`](docs/NETWORK.md), network, proxy, and TLS behavior
 - [`docs/SMOKE.md`](docs/SMOKE.md), manual smoke testing
 - [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md), real-server compatibility
 
