@@ -52,4 +52,5 @@ detection, core WebDAV file-transfer commands, and initial OCS share listing:
 - `deck stacks create --board <id> --title <title> [--order <n>] [--dry-run]`
 - `deck cards --board <id> [--include-archived]`
 - `deck cards create --board <id> --stack <id> --title <title> [--description <markdown>] [--due-at <datetime>] [--order <n>] [--dry-run]`
+- `deck cards update <card-id> --board <id> --stack <id> [--title <title>] [--description <markdown>] [--due-at <datetime>] [--order <n>] [--dry-run]`
 - `update check`

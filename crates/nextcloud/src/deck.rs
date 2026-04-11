@@ -98,7 +98,37 @@ impl DeckClient {
                 },
             )
             .await?;
-        Ok(DeckCard::from_raw(raw, options.stack_id.clone(), None))
+        let mut card = DeckCard::from_raw(raw, options.stack_id.clone(), None);
+        if card.board_id.is_empty() {
+            card.board_id = options.board_id.clone();
+        }
+        Ok(card)
+    }
+
+    pub async fn update_card(&self, options: &DeckCardUpdateOptions) -> Result<DeckCard> {
+        let path = format!(
+            "index.php/apps/deck/api/v1.0/boards/{}/stacks/{}/cards/{}",
+            options.board_id, options.stack_id, options.card_id
+        );
+        let raw: RawDeckCard = self
+            .client
+            .request_json_with_ocs_header(
+                Method::PUT,
+                &path,
+                &DeckCardUpdateRequest {
+                    title: options.title.as_deref(),
+                    card_type: Some("plain"),
+                    order: options.order,
+                    description: options.description.as_deref(),
+                    duedate: options.due_at.as_deref(),
+                },
+            )
+            .await?;
+        let mut card = DeckCard::from_raw(raw, options.stack_id.clone(), None);
+        if card.board_id.is_empty() {
+            card.board_id = options.board_id.clone();
+        }
+        Ok(card)
     }
 }
 
@@ -170,6 +200,17 @@ pub struct DeckCardCreateOptions {
     pub order: Option<i64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeckCardUpdateOptions {
+    pub board_id: String,
+    pub stack_id: String,
+    pub card_id: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub due_at: Option<String>,
+    pub order: Option<i64>,
+}
+
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 struct RawDeckBoard {
     #[serde(flatten)]
@@ -206,6 +247,20 @@ struct DeckCardCreateRequest<'a> {
     title: &'a str,
     #[serde(rename = "type")]
     card_type: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    order: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duedate: Option<&'a str>,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckCardUpdateRequest<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<&'a str>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    card_type: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     order: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -497,5 +552,20 @@ mod tests {
         assert_eq!(value["order"], 999);
         assert_eq!(value["description"], "private body");
         assert_eq!(value["duedate"], "2026-04-10T12:00:00+00:00");
+    }
+
+    #[test]
+    fn serializes_card_update_request_with_partial_fields() {
+        let request = DeckCardUpdateRequest {
+            title: Some("Updated"),
+            card_type: Some("plain"),
+            order: None,
+            description: None,
+            duedate: None,
+        };
+        let value = serde_json::to_value(request).expect("serializes");
+        assert_eq!(value["title"], "Updated");
+        assert_eq!(value["type"], "plain");
+        assert!(value.get("description").is_none());
     }
 }

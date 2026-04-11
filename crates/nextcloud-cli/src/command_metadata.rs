@@ -223,6 +223,11 @@ pub fn command_schema() -> CommandSchema {
                 "DeckCardCreateResult",
             ),
             stable(
+                "deck cards update",
+                "Update a Deck card title, description, due date, or order, with dry-run support.",
+                "DeckCardUpdateResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

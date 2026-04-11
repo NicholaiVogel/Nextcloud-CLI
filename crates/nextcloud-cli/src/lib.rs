@@ -1965,72 +1965,148 @@ async fn handle_deck(
             })
         }
         DeckCommand::Cards(args) => {
-            if let Some(commands::DeckCardsCommand::Create(create_args)) = args.command {
-                let card = build_deck_card_create_options(&create_args);
-                if create_args.dry_run {
-                    record(
-                        store.paths(),
-                        &command_executed(
-                            &profile.name,
-                            profile.server.as_str(),
-                            "deck.cards.create",
-                            true,
-                            "POST",
-                            "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards",
-                            target([
-                                ("board_id", json!(card.board_id.clone())),
-                                ("stack_id", json!(card.stack_id.clone())),
-                                ("title", json!(card.title.clone())),
-                                ("description_present", json!(card.description.is_some())),
-                                ("due_at", json!(card.due_at.clone())),
-                                ("order", json!(card.order)),
-                            ]),
-                        ),
-                    );
-                    return json_value(DeckCardCreateOutput {
-                        profile: profile.name,
-                        server: profile.server.to_string(),
-                        dry_run: true,
-                        created: false,
-                        card: DeckCardCreatePreview::from_options(&card, None),
-                    });
-                }
+            if let Some(command) = args.command {
+                match command {
+                    commands::DeckCardsCommand::Create(create_args) => {
+                        let card = build_deck_card_create_options(&create_args);
+                        if create_args.dry_run {
+                            record(
+                                store.paths(),
+                                &command_executed(
+                                    &profile.name,
+                                    profile.server.as_str(),
+                                    "deck.cards.create",
+                                    true,
+                                    "POST",
+                                    "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards",
+                                    target([
+                                        ("board_id", json!(card.board_id.clone())),
+                                        ("stack_id", json!(card.stack_id.clone())),
+                                        ("title", json!(card.title.clone())),
+                                        ("description_present", json!(card.description.is_some())),
+                                        ("due_at", json!(card.due_at.clone())),
+                                        ("order", json!(card.order)),
+                                    ]),
+                                ),
+                            );
+                            return json_value(DeckCardCreateOutput {
+                                profile: profile.name,
+                                server: profile.server.to_string(),
+                                dry_run: true,
+                                created: false,
+                                card: DeckCardWritePreview::from_create_options(&card, None),
+                            });
+                        }
 
-                let created = match deck.create_card(&card).await {
-                    Ok(card) => card,
-                    Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
-                        return Err(CliError::AppUnavailable {
-                            app: "deck".to_owned(),
-                            api_source: "deck".to_owned(),
+                        let created = match deck.create_card(&card).await {
+                            Ok(card) => card,
+                            Err(nextcloud::Error::HttpStatus { status, .. })
+                                if status.as_u16() == 404 =>
+                            {
+                                return Err(CliError::AppUnavailable {
+                                    app: "deck".to_owned(),
+                                    api_source: "deck".to_owned(),
+                                });
+                            }
+                            Err(error) => return Err(error.into()),
+                        };
+                        record(
+                            store.paths(),
+                            &command_executed(
+                                &profile.name,
+                                profile.server.as_str(),
+                                "deck.cards.create",
+                                false,
+                                "POST",
+                                "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards",
+                                target([
+                                    ("board_id", json!(created.board_id.clone())),
+                                    ("stack_id", json!(created.stack_id.clone())),
+                                    ("card_id", json!(created.id.clone())),
+                                    ("title", json!(created.title.clone())),
+                                    ("description_present", json!(created.description.is_some())),
+                                ]),
+                            ),
+                        );
+                        return json_value(DeckCardCreateOutput {
+                            profile: profile.name,
+                            server: profile.server.to_string(),
+                            dry_run: false,
+                            created: true,
+                            card: DeckCardWritePreview::from_card(&created),
                         });
                     }
-                    Err(error) => return Err(error.into()),
-                };
-                record(
-                    store.paths(),
-                    &command_executed(
-                        &profile.name,
-                        profile.server.as_str(),
-                        "deck.cards.create",
-                        false,
-                        "POST",
-                        "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards",
-                        target([
-                            ("board_id", json!(created.board_id.clone())),
-                            ("stack_id", json!(created.stack_id.clone())),
-                            ("card_id", json!(created.id.clone())),
-                            ("title", json!(created.title.clone())),
-                            ("description_present", json!(created.description.is_some())),
-                        ]),
-                    ),
-                );
-                return json_value(DeckCardCreateOutput {
-                    profile: profile.name,
-                    server: profile.server.to_string(),
-                    dry_run: false,
-                    created: true,
-                    card: DeckCardCreatePreview::from_card(&created),
-                });
+                    commands::DeckCardsCommand::Update(update_args) => {
+                        let card = build_deck_card_update_options(&update_args)?;
+                        if update_args.dry_run {
+                            record(
+                                store.paths(),
+                                &command_executed(
+                                    &profile.name,
+                                    profile.server.as_str(),
+                                    "deck.cards.update",
+                                    true,
+                                    "PUT",
+                                    "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards/{card-id}",
+                                    target([
+                                        ("board_id", json!(card.board_id.clone())),
+                                        ("stack_id", json!(card.stack_id.clone())),
+                                        ("card_id", json!(card.card_id.clone())),
+                                        ("title", json!(card.title.clone())),
+                                        ("description_present", json!(card.description.is_some())),
+                                        ("due_at", json!(card.due_at.clone())),
+                                        ("order", json!(card.order)),
+                                    ]),
+                                ),
+                            );
+                            return json_value(DeckCardUpdateOutput {
+                                profile: profile.name,
+                                server: profile.server.to_string(),
+                                dry_run: true,
+                                updated: false,
+                                card: DeckCardWritePreview::from_update_options(&card),
+                            });
+                        }
+
+                        let updated = match deck.update_card(&card).await {
+                            Ok(card) => card,
+                            Err(nextcloud::Error::HttpStatus { status, .. })
+                                if status.as_u16() == 404 =>
+                            {
+                                return Err(CliError::AppUnavailable {
+                                    app: "deck".to_owned(),
+                                    api_source: "deck".to_owned(),
+                                });
+                            }
+                            Err(error) => return Err(error.into()),
+                        };
+                        record(
+                            store.paths(),
+                            &command_executed(
+                                &profile.name,
+                                profile.server.as_str(),
+                                "deck.cards.update",
+                                false,
+                                "PUT",
+                                "/index.php/apps/deck/api/v1.0/boards/{board-id}/stacks/{stack-id}/cards/{card-id}",
+                                target([
+                                    ("board_id", json!(updated.board_id.clone())),
+                                    ("stack_id", json!(updated.stack_id.clone())),
+                                    ("card_id", json!(updated.id.clone())),
+                                    ("title", json!(updated.title.clone())),
+                                    ("description_present", json!(updated.description.is_some())),
+                                ]),
+                            ),
+                        );
+                        return json_value(DeckCardUpdateOutput {
+                            profile: profile.name,
+                            server: profile.server.to_string(),
+                            dry_run: false,
+                            updated: true,
+                            card: DeckCardWritePreview::from_card(&updated),
+                        });
+                    }
+                }
             }
 
             let board_id = args.board.clone().ok_or(CliError::MissingDeckBoard)?;
@@ -2093,6 +2169,27 @@ fn build_deck_card_create_options(
         due_at: args.due_at.clone(),
         order: args.order,
     }
+}
+
+fn build_deck_card_update_options(
+    args: &commands::DeckCardUpdateArgs,
+) -> CliResult<nextcloud::DeckCardUpdateOptions> {
+    if args.title.is_none()
+        && args.description.is_none()
+        && args.due_at.is_none()
+        && args.order.is_none()
+    {
+        return Err(CliError::NoDeckCardUpdateFields);
+    }
+    Ok(nextcloud::DeckCardUpdateOptions {
+        board_id: args.board.clone(),
+        stack_id: args.stack.clone(),
+        card_id: args.card_id.clone(),
+        title: args.title.clone(),
+        description: args.description.clone(),
+        due_at: args.due_at.clone(),
+        order: args.order,
+    })
 }
 
 fn normalize_deck_color(value: &str) -> CliResult<String> {
@@ -2652,11 +2749,20 @@ struct DeckCardCreateOutput {
     server: String,
     dry_run: bool,
     created: bool,
-    card: DeckCardCreatePreview,
+    card: DeckCardWritePreview,
 }
 
 #[derive(Debug, Serialize)]
-struct DeckCardCreatePreview {
+struct DeckCardUpdateOutput {
+    profile: String,
+    server: String,
+    dry_run: bool,
+    updated: bool,
+    card: DeckCardWritePreview,
+}
+
+#[derive(Debug, Serialize)]
+struct DeckCardWritePreview {
     #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<String>,
     board_id: String,
@@ -2669,13 +2775,25 @@ struct DeckCardCreatePreview {
     order: Option<i64>,
 }
 
-impl DeckCardCreatePreview {
-    fn from_options(options: &nextcloud::DeckCardCreateOptions, id: Option<String>) -> Self {
+impl DeckCardWritePreview {
+    fn from_create_options(options: &nextcloud::DeckCardCreateOptions, id: Option<String>) -> Self {
         Self {
             id,
             board_id: options.board_id.clone(),
             stack_id: options.stack_id.clone(),
             title: options.title.clone(),
+            description_present: options.description.is_some(),
+            due_at: options.due_at.clone(),
+            order: options.order,
+        }
+    }
+
+    fn from_update_options(options: &nextcloud::DeckCardUpdateOptions) -> Self {
+        Self {
+            id: Some(options.card_id.clone()),
+            board_id: options.board_id.clone(),
+            stack_id: options.stack_id.clone(),
+            title: options.title.clone().unwrap_or_default(),
             description_present: options.description.is_some(),
             due_at: options.due_at.clone(),
             order: options.order,

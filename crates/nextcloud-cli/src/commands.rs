@@ -605,6 +605,7 @@ pub struct DeckCardsArgs {
 #[derive(Debug, Subcommand)]
 pub enum DeckCardsCommand {
     Create(DeckCardCreateArgs),
+    Update(DeckCardUpdateArgs),
 }
 
 #[derive(Debug, Args)]
@@ -617,6 +618,32 @@ pub struct DeckCardCreateArgs {
 
     #[arg(long)]
     pub title: String,
+
+    #[arg(long)]
+    pub description: Option<String>,
+
+    #[arg(long)]
+    pub due_at: Option<String>,
+
+    #[arg(long)]
+    pub order: Option<i64>,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct DeckCardUpdateArgs {
+    pub card_id: String,
+
+    #[arg(long)]
+    pub board: String,
+
+    #[arg(long)]
+    pub stack: String,
+
+    #[arg(long)]
+    pub title: Option<String>,
 
     #[arg(long)]
     pub description: Option<String>,

@@ -1494,6 +1494,82 @@ fn deck_card_create_dry_run_hides_description() -> Result<(), Box<dyn std::error
 }
 
 #[test]
+fn deck_card_update_dry_run_requires_fields_and_hides_description()
+-> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "deck",
+            "cards",
+            "update",
+            "99",
+            "--board",
+            "10",
+            "--stack",
+            "4",
+            "--dry-run",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("no_deck_card_update_fields"));
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "deck",
+            "cards",
+            "update",
+            "99",
+            "--board",
+            "10",
+            "--stack",
+            "4",
+            "--title",
+            "Updated",
+            "--description",
+            "private update description",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"updated\": false"))
+        .stdout(predicate::str::contains("\"description_present\": true"))
+        .stdout(predicate::str::contains("private update description").not());
+
+    Ok(())
+}
+
+#[test]
 fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
 
