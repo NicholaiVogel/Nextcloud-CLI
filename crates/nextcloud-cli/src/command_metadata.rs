@@ -178,6 +178,11 @@ pub fn command_schema() -> CommandSchema {
                 "ActivityRecentResult",
             ),
             stable(
+                "notes list",
+                "List notes through the Nextcloud Notes API.",
+                "NotesListResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

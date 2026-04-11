@@ -12,6 +12,7 @@ pub mod config_schema;
 pub mod contacts;
 pub mod error;
 pub mod models;
+pub mod notes;
 pub mod ocs;
 pub mod shares;
 pub mod webdav;
@@ -29,6 +30,7 @@ pub use config_schema::{
 };
 pub use contacts::{Contact, ContactCreateOptions, ContactSearchOptions, ContactsClient};
 pub use error::{Error, Result};
+pub use notes::{Note, NotesClient, NotesListOptions};
 pub use ocs::{OcsEnvelope, OcsMeta};
 pub use shares::{Share, ShareCreatePublicOptions, ShareListOptions, SharesClient};
 pub use webdav::{WebDavClient, WebDavEntry};

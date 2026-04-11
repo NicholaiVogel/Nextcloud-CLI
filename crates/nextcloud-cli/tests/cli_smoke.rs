@@ -1099,6 +1099,56 @@ fn activity_recent_help_and_limit_validation() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
+fn notes_list_help_and_limit_validation() -> Result<(), Box<dyn std::error::Error>> {
+    Command::cargo_bin("nextcloud-cli")?
+        .args(["notes", "list", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--category"))
+        .stdout(predicate::str::contains("--exclude-content"))
+        .stdout(predicate::str::contains("--limit"));
+
+    let temp = TempDir::new()?;
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "notes",
+            "list",
+            "--limit",
+            "0",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("invalid_limit"));
+
+    Ok(())
+}
+
+#[test]
 fn env_profile_selects_profile_when_flag_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
 

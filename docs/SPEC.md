@@ -1879,6 +1879,9 @@ Behavior:
 - Use Notes chunking parameters where needed for large result sets.
 - Normalize Unix `modified` into both `modified_unix` and `modified_at`.
 - If the Notes app is unavailable, return `app_unavailable` with source `notes`.
+- Status: `notes list [--category <name>] [--exclude-content] [--limit <n>]`
+  is implemented for the Notes API v1 list endpoint. App-unavailable mapping
+  and chunk cursors remain planned.
 
 Expected output:
 
@@ -5321,7 +5324,7 @@ nextcloud-cli calendar create --calendar personal --summary Test --starts-at 202
 
 Deliverables:
 
-- Notes read/write commands
+- Notes read/write commands: `notes list` implemented
 - Deck board, stack, and card commands
 - Activity feed command: implemented for `activity recent --limit <n>`
 - optional app unavailable mapping

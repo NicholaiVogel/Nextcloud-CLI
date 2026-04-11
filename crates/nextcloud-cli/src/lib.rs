@@ -19,8 +19,8 @@ use audit::{command_executed, record, remote_path_target, share_id_target, targe
 use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
     ActivityCommand, AuthAppPasswordArgs, AuthCommand, CalendarCommand, CalendarEventsArgs, Cli,
-    Command, CommandsCommand, ConfigCommand, ContactsCommand, FilesCommand, ProfilePolicySetArgs,
-    ProfilesCommand, ServerCommand, SharesCommand, UpdateCommand,
+    Command, CommandsCommand, ConfigCommand, ContactsCommand, FilesCommand, NotesCommand,
+    ProfilePolicySetArgs, ProfilesCommand, ServerCommand, SharesCommand, UpdateCommand,
 };
 use credential_store::CredentialStore;
 use error::{CliError, CliResult};
@@ -122,6 +122,15 @@ async fn run(cli: Cli) -> CliResult<Value> {
         }
         Command::Activity(command) => {
             handle_activity(
+                command,
+                selected_profile.as_deref(),
+                &store,
+                &credential_store,
+            )
+            .await
+        }
+        Command::Notes(command) => {
+            handle_notes(
                 command,
                 selected_profile.as_deref(),
                 &store,
@@ -1482,6 +1491,53 @@ async fn handle_activity(
     }
 }
 
+async fn handle_notes(
+    command: NotesCommand,
+    selected_profile: Option<&str>,
+    store: &ConfigStore,
+    credential_store: &CredentialStore,
+) -> CliResult<Value> {
+    let profile = store.selected_profile(selected_profile)?;
+    let app_password = credential_store.get_app_password(&profile.credential)?;
+    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let notes_client = nextcloud::NotesClient::new(client);
+
+    match command {
+        NotesCommand::List(args) => {
+            if args.limit == 0 || args.limit > 100 {
+                return Err(CliError::InvalidLimit { value: args.limit });
+            }
+            let notes = match notes_client
+                .list(&nextcloud::NotesListOptions {
+                    category: args.category.clone(),
+                    exclude_content: args.exclude_content,
+                    limit: args.limit,
+                })
+                .await
+            {
+                Ok(notes) => notes,
+                Err(nextcloud::Error::HttpStatus { status, .. }) if status.as_u16() == 404 => {
+                    return Err(CliError::AppUnavailable {
+                        app: "notes".to_owned(),
+                        api_source: "notes".to_owned(),
+                    });
+                }
+                Err(error) => return Err(error.into()),
+            };
+            let count = notes.len();
+            json_value(NotesListOutput {
+                profile: profile.name,
+                server: profile.server.to_string(),
+                category: args.category,
+                exclude_content: args.exclude_content,
+                limit: args.limit,
+                notes,
+                count,
+            })
+        }
+    }
+}
+
 fn resolve_calendar_range(args: &CalendarEventsArgs) -> CliResult<CalendarRangeOutput> {
     if let Some(date) = &args.date {
         return resolve_calendar_date(date);
@@ -1881,6 +1937,17 @@ struct ActivityRecentOutput {
     server: String,
     limit: u32,
     activities: Vec<nextcloud::ActivityItem>,
+    count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct NotesListOutput {
+    profile: String,
+    server: String,
+    category: Option<String>,
+    exclude_content: bool,
+    limit: u32,
+    notes: Vec<nextcloud::Note>,
     count: usize,
 }
 

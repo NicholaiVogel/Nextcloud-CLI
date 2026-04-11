@@ -197,6 +197,7 @@ Current commands:
 | Calendar | `calendar events`, `calendar create`, `calendar delete` |
 | Contacts | `contacts search`, `contacts create`, `contacts delete` |
 | Activity | `activity recent` |
+| Notes | `notes list` |
 | Updates | `update check` |
 
 See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the implemented command list and

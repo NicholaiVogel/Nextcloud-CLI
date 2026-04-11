@@ -66,6 +66,9 @@ pub enum Command {
     Activity(ActivityCommand),
 
     #[command(subcommand)]
+    Notes(NotesCommand),
+
+    #[command(subcommand)]
     Update(UpdateCommand),
 }
 
@@ -461,6 +464,23 @@ pub enum ActivityCommand {
 #[derive(Debug, Args)]
 pub struct ActivityRecentArgs {
     #[arg(long, default_value_t = 20)]
+    pub limit: u32,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum NotesCommand {
+    List(NotesListArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct NotesListArgs {
+    #[arg(long)]
+    pub category: Option<String>,
+
+    #[arg(long, default_value_t = false)]
+    pub exclude_content: bool,
+
+    #[arg(long, default_value_t = 25)]
     pub limit: u32,
 }
 

@@ -72,6 +72,9 @@ pub enum CliError {
     #[error("calendar event end must be after start")]
     InvalidCalendarEventRange,
 
+    #[error("Nextcloud app `{app}` is unavailable for source `{api_source}`")]
+    AppUnavailable { app: String, api_source: String },
+
     #[error("failed to read credentials from {path}: {source}")]
     CredentialRead {
         path: PathBuf,
@@ -150,6 +153,7 @@ impl CliError {
             Self::InvalidCalendarBound { .. } => "invalid_calendar_bound",
             Self::InvalidLimit { .. } => "invalid_limit",
             Self::InvalidCalendarEventRange => "invalid_calendar_event_range",
+            Self::AppUnavailable { .. } => "app_unavailable",
             Self::CredentialRead { .. } => "credential_read_failed",
             Self::CredentialWrite { .. } => "credential_write_failed",
             Self::CredentialParse { .. } => "credential_parse_failed",
@@ -187,6 +191,7 @@ impl CliError {
             Self::InvalidCalendarBound { .. } => 2,
             Self::InvalidLimit { .. } => 2,
             Self::InvalidCalendarEventRange => 2,
+            Self::AppUnavailable { .. } => 6,
             Self::LoginTimeout { .. } => 10,
             Self::Core(nextcloud::Error::OcsStatus { .. }) => 6,
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,
