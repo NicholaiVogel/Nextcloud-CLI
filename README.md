@@ -521,11 +521,12 @@ The current focus is distribution polish and agent experience:
 - Homebrew tap
 - real `update apply`
 - Linux arm64, musl Linux, and Windows arm64 release assets
-- setup and workflow skills for coding agents
 - broader compatibility hardening across Nextcloud server versions and apps
 
 ## Documentation
 
+- [`skills/`](skills/), agent skills for setup, files, shares, calendar,
+  contacts, Notes, Deck, and Activity
 - [`docs/COMMANDS.md`](docs/COMMANDS.md), implemented command surface
 - [`docs/CONFIG.md`](docs/CONFIG.md), configuration and credential behavior
 - [`docs/INSTALL.md`](docs/INSTALL.md), installation notes

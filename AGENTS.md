@@ -88,14 +88,16 @@ convenience hacks.
   delete. Update commands and deeper compatibility hardening remain planned.
 - Phase 5: optional apps, substantially implemented. Activity read, Notes
   list/create/update/delete, Deck boards/cards listing, and Deck board/stack/card
-  creation exist. Remaining Deck work is card update/move/archive/delete and
-  broader optional-app smoke cleanup.
+  creation, card update/move/archive/delete, and broader optional-app smoke
+  coverage exist.
 - Phase 6: distribution and agent experience, partially implemented. README,
   command metadata, CI, `nxc` alias, tagged GitHub release packaging, and
   placeholder `update check` exist. `smoke run` exists for safe redacted
   live-server health reports. The npm wrapper exists under `npm/nextcloud-cli`
   and is published as `nextcloud-cli`. The curl installer exists at
-  `install.sh`. Real self-update and agent skills remain planned.
+  `install.sh`. Agent skills exist under `skills/` for setup, files, shares,
+  calendar, contacts, notes, Deck, and Activity. Real self-update remains
+  planned.
 
 When continuing autonomously, complete the next smallest vertical slice,
 validate it, smoke it safely, commit it, push it, then update memory.

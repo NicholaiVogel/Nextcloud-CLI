@@ -5121,17 +5121,17 @@ laminate the pancake.
 
 The setup skill is complete only when:
 
-- `skills/nextcloud-cli-setup/SKILL.md` exists.
-- basic feature skills exist for files, shares, calendar, contacts, notes, deck,
-  and activity.
-- It includes install method preference order.
-- It includes safety rules.
-- It includes validation commands.
-- It keeps profile policy in safe agent mode unless the user asks otherwise.
-- It includes failure handling.
+- [x] `skills/nextcloud-cli-setup/SKILL.md` exists.
+- [x] basic feature skills exist for files, shares, calendar, contacts, notes,
+  deck, and activity.
+- [x] It includes install method preference order.
+- [x] It includes safety rules.
+- [x] It includes validation commands.
+- [x] It keeps profile policy in safe agent mode unless the user asks otherwise.
+- [x] It includes failure handling.
 - It has been tested by following it on at least one clean environment or
   container.
-- It does not instruct agents to collect or expose primary account passwords.
+- [x] It does not instruct agents to collect or expose primary account passwords.
 
 ## 39. Documentation Requirements
 
@@ -5218,8 +5218,8 @@ A release candidate is ready only when:
 - [x] curl installer downloads, verifies, and installs both binaries.
 - [ ] `nextcloud-cli update check` and direct-binary `update apply --yes` are tested.
 - [ ] Cargo package dry-run or publish succeeds.
-- [ ] `skills/nextcloud-cli-setup/SKILL.md` exists.
-- [ ] Basic feature skills exist for files, shares, calendar, contacts, notes,
+- [x] `skills/nextcloud-cli-setup/SKILL.md` exists.
+- [x] Basic feature skills exist for files, shares, calendar, contacts, notes,
       deck, and activity.
 - [ ] `docs/COMPATIBILITY.md` records tested Nextcloud server versions.
 - [ ] `profiles policy show/set/reset` are tested.
@@ -5413,8 +5413,8 @@ nextcloud-cli activity recent --limit 20 --format json
 
 Status: partial. README, install/config/network/smoke docs, CI, `nxc` alias,
 tagged GitHub release binary packaging, npm package publication, curl installer,
-and placeholder `update check` are implemented. Real self-update, skills, and
-terminal art remain pending.
+agent setup skill, feature workflow skills, and placeholder `update check` are
+implemented. Real self-update and terminal art remain pending.
 
 Deliverables:
 
@@ -5427,8 +5427,9 @@ Deliverables:
   tagged releases
 - `update check`: partial, development placeholder implemented
 - direct-binary `update apply --yes`: pending
-- setup agent skill: pending
-- basic feature skills: pending
+- setup agent skill: implemented at `skills/nextcloud-cli-setup/SKILL.md`
+- basic feature skills: implemented for files, shares, calendar, contacts,
+  notes, deck, and activity
 - terminal art assets and output gating: pending
 - built-in smoke report: implemented for safe read checks via `smoke run`
 
