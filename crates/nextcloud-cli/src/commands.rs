@@ -244,6 +244,8 @@ pub struct FilesDeleteArgs {
 pub enum SharesCommand {
     List(SharesListArgs),
     Create(SharesCreateArgs),
+    Delete(SharesDeleteArgs),
+    Revoke(SharesDeleteArgs),
 }
 
 #[derive(Debug, Args)]
@@ -270,6 +272,17 @@ pub struct SharesCreateArgs {
 
     #[arg(long)]
     pub expire_date: Option<String>,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub yes: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct SharesDeleteArgs {
+    pub share_id: String,
 
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,

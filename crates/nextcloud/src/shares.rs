@@ -54,6 +54,25 @@ impl SharesClient {
             .into_data()?;
         Ok(Share::from(raw))
     }
+
+    pub async fn delete(&self, share_id: &str) -> Result<()> {
+        let share_id = share_id.trim();
+        if share_id.is_empty() {
+            return Err(crate::Error::InvalidRemotePath {
+                path: share_id.to_owned(),
+                reason: "share id must not be empty".to_owned(),
+            });
+        }
+
+        let encoded_id: String = form_urlencoded::byte_serialize(share_id.as_bytes()).collect();
+        self.client
+            .delete_ocs_json::<OcsEnvelope<Value>>(&format!(
+                "{SHARES_ENDPOINT}/{encoded_id}?format=json"
+            ))
+            .await?
+            .into_data()?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -383,6 +402,73 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn delete_sends_ocs_delete_request() -> Result<()> {
+        let server = OneShotServer::spawn(
+            r#"{
+                "ocs": {
+                    "meta": {
+                        "status": "ok",
+                        "statuscode": 200,
+                        "message": "OK"
+                    },
+                    "data": []
+                }
+            }"#,
+        );
+
+        mock_shares(server.base_url())?.delete("123/456").await?;
+        let request = server.join();
+
+        assert_eq!(request.method, "DELETE");
+        assert_eq!(
+            request.path,
+            "/ocs/v2.php/apps/files_sharing/api/v1/shares/123%2F456?format=json"
+        );
+        assert_eq!(request.header("ocs-apirequest"), Some("true"));
+        assert!(request.header("authorization").is_some());
+        assert!(request.body.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delete_maps_ocs_failure_envelope() -> Result<()> {
+        let server = OneShotServer::spawn_with_status(
+            404,
+            r#"{
+                "ocs": {
+                    "meta": {
+                        "status": "failure",
+                        "statuscode": 404,
+                        "message": "share not found"
+                    },
+                    "data": []
+                }
+            }"#,
+        );
+
+        let error = mock_shares(server.base_url())?
+            .delete("404")
+            .await
+            .expect_err("missing share maps to OCS error");
+        let request = server.join();
+
+        assert_eq!(request.method, "DELETE");
+        match error {
+            crate::Error::OcsStatus {
+                status,
+                status_code,
+                message,
+            } => {
+                assert_eq!(status, "failure");
+                assert_eq!(status_code, 404);
+                assert_eq!(message, "share not found");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+        Ok(())
+    }
+
     fn mock_shares(base_url: &str) -> Result<SharesClient> {
         let base = Url::parse(base_url).expect("valid mock URL");
         let client = NextcloudClient::new(
@@ -418,12 +504,16 @@ mod tests {
 
     impl OneShotServer {
         fn spawn(body: &'static str) -> Self {
+            Self::spawn_with_status(200, body)
+        }
+
+        fn spawn_with_status(status: u16, body: &'static str) -> Self {
             let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
             let address = listener.local_addr().expect("read test server address");
             let handle = thread::spawn(move || {
                 let (mut stream, _) = listener.accept().expect("accept one request");
                 let request = read_request(&mut stream);
-                write_response(&mut stream, body);
+                write_response(&mut stream, status, body);
                 request
             });
 
@@ -501,9 +591,16 @@ mod tests {
         }
     }
 
-    fn write_response(stream: &mut TcpStream, body: &str) {
+    fn write_response(stream: &mut TcpStream, status: u16, body: &str) {
+        let reason = match status {
+            200 => "OK",
+            404 => "Not Found",
+            403 => "Forbidden",
+            401 => "Unauthorized",
+            _ => "Unknown",
+        };
         let response = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
             body.len(),
             body
         );

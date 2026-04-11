@@ -118,6 +118,16 @@ pub fn command_schema() -> CommandSchema {
                 "SharesCreateResult",
             ),
             stable(
+                "shares delete",
+                "Delete a share through the Nextcloud OCS files sharing API with explicit confirmation.",
+                "SharesDeleteResult",
+            ),
+            stable(
+                "shares revoke",
+                "Alias for shares delete with explicit confirmation.",
+                "SharesDeleteResult",
+            ),
+            stable(
                 "update check",
                 "Report current version and placeholder update metadata.",
                 "UpdateCheck",

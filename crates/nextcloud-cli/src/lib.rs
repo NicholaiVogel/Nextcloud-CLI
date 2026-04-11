@@ -469,7 +469,68 @@ async fn handle_shares(
                 "share": share,
             }))
         }
+        SharesCommand::Delete(args) => {
+            handle_share_delete(
+                args.share_id,
+                args.dry_run,
+                args.yes,
+                "shares delete",
+                &profile,
+                &shares_client,
+            )
+            .await
+        }
+        SharesCommand::Revoke(args) => {
+            handle_share_delete(
+                args.share_id,
+                args.dry_run,
+                args.yes,
+                "shares revoke",
+                &profile,
+                &shares_client,
+            )
+            .await
+        }
     }
+}
+
+async fn handle_share_delete(
+    share_id: String,
+    dry_run: bool,
+    yes: bool,
+    command: &str,
+    profile: &Profile,
+    shares_client: &SharesClient,
+) -> CliResult<Value> {
+    let share_id = validate_share_id(&share_id)?;
+    if dry_run {
+        return json_value(ShareDeleteOutput {
+            profile: profile.name.clone(),
+            server: profile.server.to_string(),
+            share_id,
+            dry_run: true,
+            deleted: false,
+            confirmed: false,
+            command: command.to_owned(),
+        });
+    }
+
+    if !yes {
+        return Err(CliError::SensitiveConfirmationRequired {
+            command: command.to_owned(),
+        });
+    }
+
+    shares_client.delete(&share_id).await?;
+    json_value(ShareDeleteOutput {
+        profile: profile.name.clone(),
+        server: profile.server.to_string(),
+        share_id,
+        dry_run: false,
+        deleted: true,
+        confirmed: true,
+        command: command.to_owned(),
+    })
 }
 
 fn validate_expire_date(value: &str) -> CliResult<String> {
@@ -478,6 +539,16 @@ fn validate_expire_date(value: &str) -> CliResult<String> {
         .map_err(|_| CliError::InvalidExpireDate {
             value: value.to_owned(),
         })
+}
+
+fn validate_share_id(value: &str) -> CliResult<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(CliError::InvalidShareId {
+            value: value.to_owned(),
+        });
+    }
+    Ok(trimmed.to_owned())
 }
 
 async fn handle_files(
@@ -906,6 +977,17 @@ struct FilesDeleteOutput {
     deleted: bool,
     confirmed: bool,
     entry: Option<nextcloud::WebDavEntry>,
+}
+
+#[derive(Debug, Serialize)]
+struct ShareDeleteOutput {
+    profile: String,
+    server: String,
+    share_id: String,
+    dry_run: bool,
+    deleted: bool,
+    confirmed: bool,
+    command: String,
 }
 
 #[derive(Debug, Serialize)]

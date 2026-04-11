@@ -193,7 +193,7 @@ Current commands:
 | Profiles | `profiles list`, `profiles show <name>`, `profiles set-default <name>` |
 | Server | `server status`, `server capabilities [--refresh]` |
 | Files | `files list`, `files search`, `files stat`, `files mkdir`, `files upload`, `files download`, `files delete` |
-| Shares | `shares list`, `shares create --public` |
+| Shares | `shares list`, `shares create --public`, `shares delete`, `shares revoke` |
 | Updates | `update check` |
 
 See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the implemented command list and
@@ -335,6 +335,22 @@ Actual public link creation requires both `--yes` and a profile policy that
 allows public shares. New profiles default to `allow_public_shares = false`
 until policy commands land.
 
+### Revoke shares
+
+Share deletion is destructive and sensitive. Previewing does not make a network
+request:
+
+```bash
+nxc --profile personal shares delete 123 --dry-run
+nxc --profile personal shares revoke 123 --dry-run
+```
+
+Actual revocation requires `--yes`:
+
+```bash
+nxc --profile personal shares revoke 123 --yes
+```
+
 ## Environment variables
 
 Implemented environment variables:
@@ -452,7 +468,8 @@ Current Phase 3 work is sharing and safety policy:
 - `shares list`, implemented
 - public link creation with dry-run support and guarded actual execution,
   implemented
-- share revoke/delete with confirmation
+- share revoke/delete with dry-run support and explicit confirmation,
+  implemented
 - per-profile policy enforcement
 - audit event shape for writes
 

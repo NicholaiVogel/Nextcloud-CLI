@@ -1489,8 +1489,8 @@ Completion gate:
 Syntax:
 
 ```bash
-nextcloud-cli shares delete <share-id> [--yes]
-nextcloud-cli shares revoke <share-id> [--yes]
+nextcloud-cli shares delete <share-id> [--dry-run] [--yes]
+nextcloud-cli shares revoke <share-id> [--dry-run] [--yes]
 ```
 
 Backing API:
@@ -1499,12 +1499,13 @@ Backing API:
 
 Behavior:
 
-- `shares revoke` is an alias for `shares delete` if both are implemented.
+- `shares revoke` is an alias for `shares delete`.
 - Safety class is both `destructive` and `sensitive`.
 - Non-interactive contexts require `--yes`.
 - Support `--dry-run`.
 - Return the deleted share id and selected profile/server.
 - If the share id is missing or already gone, return a structured OCS error.
+- Status: implemented.
 
 Expected output:
 
@@ -5247,7 +5248,8 @@ Deliverables:
 - `shares list`: implemented with `--path`, `--shared-with-me`, and
   `--include-tags`
 - `shares create --public`: implemented for dry-run and guarded actual execution
-- `shares delete` / `shares revoke`
+- `shares delete` / `shares revoke`: implemented with dry-run and guarded actual
+  execution
 - destructive action confirmation model
 - first version of per-profile policy enforcement
 - audit event shape for writes
@@ -5257,6 +5259,7 @@ Completion signal:
 ```bash
 nextcloud-cli shares list --format json
 nextcloud-cli shares create /path/to/file --public --dry-run --format json
+nextcloud-cli shares delete 123 --dry-run --format json
 nextcloud-cli profiles policy show personal --format json
 ```
 

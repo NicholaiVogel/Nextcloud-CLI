@@ -90,13 +90,7 @@ impl NextcloudClient {
         }
 
         let response = request.send().await?;
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_else(|_| String::new());
-            return Err(Error::HttpStatus { status, body });
-        }
-
-        Ok(response.json::<T>().await?)
+        parse_ocs_json_response(response).await
     }
 
     pub async fn post_empty_json<T>(&self, path: &str) -> Result<T>
@@ -133,7 +127,21 @@ impl NextcloudClient {
         }
 
         let response = request.send().await?;
-        parse_json_response(response).await
+        parse_ocs_json_response(response).await
+    }
+
+    pub async fn delete_ocs_json<T>(&self, path: &str) -> Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        let url = self.join(path)?;
+        let mut request = self.http.delete(url).header("OCS-APIRequest", "true");
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+
+        let response = request.send().await?;
+        parse_ocs_json_response(response).await
     }
 
     pub async fn request_text(
@@ -304,6 +312,23 @@ where
     }
 
     Ok(response.json::<T>().await?)
+}
+
+async fn parse_ocs_json_response<T>(response: reqwest::Response) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let status = response.status();
+    if status.is_success() {
+        return Ok(response.json::<T>().await?);
+    }
+
+    let body = response.text().await.unwrap_or_else(|_| String::new());
+    if let Ok(value) = serde_json::from_str::<T>(&body) {
+        return Ok(value);
+    }
+
+    Err(Error::HttpStatus { status, body })
 }
 
 #[cfg(test)]
