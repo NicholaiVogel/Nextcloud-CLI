@@ -21,9 +21,6 @@
 > [!NOTE]
 > This is not an officially supported Nextcloud product.
 
-> [!IMPORTANT]
-> This project is under active development. Expect breaking changes before v1.0.
-
 `nxc` talks to existing Nextcloud HTTP APIs from a local machine, SSH session,
 CI job, or agent runtime. It authenticates as a normal user and provides a
 scriptable handle on files, shares, calendars, contacts, Notes, Deck, Activity,
@@ -75,7 +72,6 @@ hardens.
 | Optional apps | Activity, Notes, and Deck commands |
 | Agents | JSON output, command schema, redacted smoke reports |
 
-The canonical product contract lives in [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Install
 
@@ -530,7 +526,6 @@ The current focus is distribution polish and agent experience:
 
 ## Documentation
 
-- [`docs/SPEC.md`](docs/SPEC.md), canonical product spec
 - [`docs/COMMANDS.md`](docs/COMMANDS.md), implemented command surface
 - [`docs/CONFIG.md`](docs/CONFIG.md), configuration and credential behavior
 - [`docs/INSTALL.md`](docs/INSTALL.md), installation notes
