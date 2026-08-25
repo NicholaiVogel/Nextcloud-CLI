@@ -7,6 +7,24 @@ pub enum CliError {
     #[error(transparent)]
     Core(#[from] nextcloud::Error),
 
+    #[error(transparent)]
+    Index(#[from] nextcloud_index::Error),
+
+    #[error("local media index for profile `{profile}` is unavailable; run `index build` first")]
+    LocalIndexUnavailable { profile: String },
+
+    #[error("local query image {path} is not a file")]
+    LocalQueryNotFile { path: PathBuf },
+
+    #[error("index scan exceeds the maximum of {limit} files; narrow --path or raise --max-files")]
+    IndexLimitExceeded { limit: u32 },
+
+    #[error("video indexing requires ffmpeg in PATH")]
+    VideoToolUnavailable,
+
+    #[error("video frame extraction failed: {message}")]
+    VideoExtractionFailed { message: String },
+
     #[error("app password is required; pass --app-password or set NEXTCLOUD_APP_PASSWORD")]
     MissingAppPassword,
 
@@ -160,6 +178,12 @@ impl CliError {
     pub fn code(&self) -> &'static str {
         match self {
             Self::Core(error) => error.code(),
+            Self::Index(_) => "visual_index_failed",
+            Self::LocalIndexUnavailable { .. } => "local_index_unavailable",
+            Self::LocalQueryNotFile { .. } => "local_query_not_file",
+            Self::IndexLimitExceeded { .. } => "index_limit_exceeded",
+            Self::VideoToolUnavailable => "video_tool_unavailable",
+            Self::VideoExtractionFailed { .. } => "video_extraction_failed",
             Self::MissingAppPassword => "missing_app_password",
             Self::MissingAccountPassword => "missing_account_password",
             Self::PasswordEnvMissing { .. } => "password_env_missing",
@@ -205,6 +229,11 @@ impl CliError {
             Self::Core(nextcloud::Error::ProfileNotFound { .. }) => 2,
             Self::Core(nextcloud::Error::CredentialNotFound { .. }) => 2,
             Self::Core(nextcloud::Error::InvalidRemotePath { .. }) => 2,
+            Self::LocalIndexUnavailable { .. } => 2,
+            Self::LocalQueryNotFile { .. } => 2,
+            Self::IndexLimitExceeded { .. } => 2,
+            Self::VideoToolUnavailable => 2,
+            Self::VideoExtractionFailed { .. } => 2,
             Self::MissingAppPassword => 2,
             Self::MissingAccountPassword => 2,
             Self::PasswordEnvMissing { .. } => 2,

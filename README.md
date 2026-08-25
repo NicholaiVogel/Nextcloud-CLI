@@ -53,8 +53,8 @@ It gives you:
 - **Local control:** credentials stay on the machine running the CLI.
 - **Agent-ready output:** JSON by default, command metadata, and redacted smoke
   reports.
-- **Useful coverage:** files, shares, calendar, contacts, Notes, Deck, Activity,
-  profiles, capabilities, and smoke checks.
+- **Useful coverage:** files, local visual media search, shares, calendar, contacts,
+  Notes, Deck, Activity, profiles, capabilities, and smoke checks.
 - **Guarded writes:** dry-run previews, explicit confirmation, profile policy,
   and secret-redacted audit logs.
 - **Headless setup:** browser login for desktops, app-password flows for SSH and
@@ -66,7 +66,7 @@ It gives you:
 
 | Area | Current support |
 | --- | --- |
-| Files | List, search, stat, mkdir, upload, download, guarded delete |
+| Files | List, name-search, visual-search, stat, mkdir, upload, download, guarded delete |
 | Shares | List, create public links, delete, revoke, preview sensitive actions |
 | Calendar | List events, create events, guarded delete |
 | Contacts | Search, create, guarded delete |
@@ -89,6 +89,15 @@ nxc --profile personal files list /
 
 For SSH and headless machines, use the app-password setup flow documented in
 [`docs/USAGE.md`](docs/USAGE.md).
+
+To search by visual similarity, build the explicit local index first:
+
+```bash
+nxc --profile personal index build --path /Projects --media all --format json
+nxc --profile personal files search-image ./reference-frame.png \
+  --path /Projects --media all --format json
+```
+
 
 ## Install
 

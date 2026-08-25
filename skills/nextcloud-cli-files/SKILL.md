@@ -48,6 +48,23 @@ Prefer `jq` for local filtering instead of dumping large trees:
 nxc --profile personal files list /Documents --format json | jq '.items[] | {name, path, type, size}'
 ```
 
+## Visual media search
+
+The files skill also supports reference-image search against an explicit local
+media index:
+
+```bash
+nxc --profile personal index build --path /Projects --media all --format json
+nxc --profile personal files search-image ./reference-frame.png \
+  --path /Projects --media all --limit 25 --format json
+nxc --profile personal index update --path /Projects --format json
+nxc --profile personal index status --format json
+```
+
+Indexing is never implicit. Use `index clear --yes` to remove the selected
+profile's local index. Image matching uses perceptual fingerprints; video matching
+samples frames with `ffmpeg` and refines the strongest candidates around their
+coarse timestamps.
 ## Create folders
 
 Preview or create a folder:

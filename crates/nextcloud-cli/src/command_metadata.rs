@@ -98,6 +98,31 @@ pub fn command_schema() -> CommandSchema {
                 "FilesSearchResult",
             ),
             stable(
+                "files search-image",
+                "Search indexed image and video frames by a local reference image.",
+                "FilesVisualSearchResult",
+            ),
+            stable(
+                "index status",
+                "Show the selected profile's local media index status.",
+                "IndexStatus",
+            ),
+            stable(
+                "index build",
+                "Build an explicit local image and video frame index from WebDAV.",
+                "IndexBuildResult",
+            ),
+            stable(
+                "index update",
+                "Incrementally update the selected profile's local media index.",
+                "IndexBuildResult",
+            ),
+            stable(
+                "index clear",
+                "Remove the selected profile's local media index with confirmation.",
+                "IndexClearResult",
+            ),
+            stable(
                 "files stat",
                 "Fetch metadata for one remote Nextcloud path through WebDAV.",
                 "WebDavEntry",
