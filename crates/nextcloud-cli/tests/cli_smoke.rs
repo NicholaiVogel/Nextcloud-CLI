@@ -27,6 +27,22 @@ fn commands_schema_is_json() -> Result<(), Box<dyn std::error::Error>> {
             .iter()
             .any(|command| command["name"] == "smoke run")
     );
+    for name in [
+        "files search-image",
+        "index status",
+        "index build",
+        "index update",
+        "index clear",
+    ] {
+        assert!(
+            value["commands"]
+                .as_array()
+                .expect("commands array")
+                .iter()
+                .any(|command| command["name"] == name),
+            "missing command metadata for {name}"
+        );
+    }
     Ok(())
 }
 
@@ -235,6 +251,81 @@ fn files_search_rejects_unsupported_mode() -> Result<(), Box<dyn std::error::Err
         .failure()
         .code(2)
         .stderr(predicate::str::contains("unsupported_search_mode"));
+
+    Ok(())
+}
+
+#[test]
+fn visual_search_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
+    Command::cargo_bin("nextcloud-cli")?
+        .args(["files", "search-image", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--video-candidates"))
+        .stdout(predicate::str::contains("--media"));
+
+    Command::cargo_bin("nextcloud-cli")?
+        .args(["index", "build", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--video-sample-rate"))
+        .stdout(predicate::str::contains("--max-files"));
+
+    Ok(())
+}
+
+#[test]
+fn index_status_requires_a_built_index() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "index",
+            "status",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("local_index_unavailable"));
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "index",
+            "clear",
+            "--yes",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"cleared\": false"));
 
     Ok(())
 }

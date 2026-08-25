@@ -109,7 +109,11 @@ Potential backends:
 - server unified search when available
 - full-text search collections when available
 - DAV name search fallback
-- optional local index later, with explicit consent
+- optional local text index later, with explicit consent
+
+Visual similarity is a separate local-media feature rather than a server search
+backend. It is implemented as an explicit profile-scoped index; it does not
+pretend that Unified Search or FullTextSearch can compare image pixels.
 
 Why it matters:
 
@@ -122,6 +126,27 @@ Safety requirements:
 - snippets and matched text are private data
 - results should support summaries and limits
 - local indexing requires explicit opt-in and clear storage docs
+
+### Implemented visual media search slice
+
+The first visual-search slice is deliberately narrow and useful for workflows
+that need to find a screenshot, still, or video frame in a Nextcloud library:
+
+```bash
+nxc --profile personal index build --path /Projects --media all
+nxc --profile personal files search-image ./reference-frame.png --path /Projects
+nxc --profile personal index update --path /Projects
+nxc --profile personal index status
+nxc --profile personal index clear --yes
+```
+
+Images use local perceptual fingerprints. Videos are sampled with `ffmpeg`, then
+the strongest candidates are refined around their coarse match timestamps. The
+index is opt-in, profile-scoped, incremental by WebDAV metadata/ETag, and stored
+in the local cache. Original media is downloaded only to temporary files while
+it is being fingerprinted. Semantic embeddings and natural-language image search
+remain future work because they introduce model distribution, CPU/GPU, and
+privacy trade-offs that this CLI should not impose by default.
 
 ### 5. Tags, favorites, and comments
 

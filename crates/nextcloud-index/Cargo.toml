@@ -1,0 +1,21 @@
+[package]
+name = "nextcloud-index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+description = "Local media index and visual matching primitives for nextcloud-cli."
+keywords = ["nextcloud", "image-search", "media", "sqlite"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+image.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3.13"

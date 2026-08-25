@@ -5,6 +5,7 @@ mod commands;
 mod credential_store;
 mod error;
 mod output;
+mod visual_search;
 
 use chrono::{DateTime, Days, Local, LocalResult, NaiveDate, TimeZone, Utc};
 use clap::Parser;
@@ -21,8 +22,8 @@ use capability_cache::{CachedCapabilities, CapabilityCache};
 use commands::{
     ActivityCommand, AuthAppPasswordArgs, AuthCommand, CalendarCommand, CalendarEventsArgs, Cli,
     Command, CommandsCommand, ConfigCommand, ContactsCommand, DeckCommand, FilesCommand,
-    NotesCommand, ProfilePolicySetArgs, ProfilesCommand, ServerCommand, SharesCommand,
-    SmokeCommand, UpdateCommand,
+    IndexCommand, NotesCommand, ProfilePolicySetArgs, ProfilesCommand, ServerCommand,
+    SharesCommand, SmokeCommand, UpdateCommand,
 };
 use credential_store::CredentialStore;
 use error::{CliError, CliResult};
@@ -88,6 +89,15 @@ async fn run(cli: Cli) -> CliResult<Value> {
         }
         Command::Files(command) => {
             handle_files(
+                command,
+                selected_profile.as_deref(),
+                &store,
+                &credential_store,
+            )
+            .await
+        }
+        Command::Index(command) => {
+            handle_index(
                 command,
                 selected_profile.as_deref(),
                 &store,
@@ -851,6 +861,16 @@ async fn handle_files(
                 "count": count,
             }))
         }
+        FilesCommand::SearchImage(args) => {
+            let options = visual_search::SearchOptions {
+                root: args.path,
+                media: args.media,
+                limit: args.limit,
+                video_candidates: args.video_candidates,
+            };
+            visual_search::search_image(&webdav, store.paths(), &profile, &args.query, &options)
+                .await
+        }
         FilesCommand::Stat(args) => {
             let path = nextcloud::webdav::normalize_remote_path(&args.path)?;
             let entry = webdav.stat(&path).await?;
@@ -1048,6 +1068,45 @@ async fn handle_files(
                 confirmed: args.yes,
                 entry,
             })
+        }
+    }
+}
+
+async fn handle_index(
+    command: IndexCommand,
+    selected_profile: Option<&str>,
+    store: &ConfigStore,
+    credential_store: &CredentialStore,
+) -> CliResult<Value> {
+    let profile = store.selected_profile(selected_profile)?;
+    match command {
+        IndexCommand::Status => visual_search::index_status(store.paths(), &profile).await,
+        IndexCommand::Clear(args) => visual_search::clear_index(store.paths(), &profile, args.yes),
+        IndexCommand::Build(args) => {
+            let app_password = credential_store.get_app_password(&profile.credential)?;
+            let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+            let webdav = WebDavClient::new(client, profile.username.clone());
+            let options = visual_search::IndexOptions {
+                root: args.path,
+                media: args.media,
+                max_files: args.max_files,
+                video_sample_rate: args.video_sample_rate,
+                update_only: false,
+            };
+            visual_search::build_index(&webdav, store.paths(), &profile, &options).await
+        }
+        IndexCommand::Update(args) => {
+            let app_password = credential_store.get_app_password(&profile.credential)?;
+            let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+            let webdav = WebDavClient::new(client, profile.username.clone());
+            let options = visual_search::IndexOptions {
+                root: args.path,
+                media: args.media,
+                max_files: args.max_files,
+                video_sample_rate: args.video_sample_rate,
+                update_only: true,
+            };
+            visual_search::build_index(&webdav, store.paths(), &profile, &options).await
         }
     }
 }
