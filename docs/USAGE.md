@@ -26,6 +26,23 @@ nxc --profile personal files list /
 That gives you a stored app password, a saved profile, and a JSON listing of
 your root folder.
 
+## TLS for self-hosted servers
+
+For a server using an internal CA, pass a PEM bundle for the command or set the
+environment variable:
+
+```bash
+nxc --ca-bundle /path/to/nextcloud-ca.pem --profile personal server status
+NEXTCLOUD_CLI_CA_BUNDLE=/path/to/nextcloud-ca.pem nxc --profile personal files list /
+```
+
+The custom bundle is added to the system trust store. Hostname verification is
+still enforced, so the server URL must match the certificate SAN. Untrusted
+issuer, hostname mismatch, and handshake failures return stable TLS error codes
+with an actionable hint. Use `--insecure` only as an explicit emergency
+override; it disables both checks, prints a warning, is not persisted, and is
+rejected for agent-managed profiles.
+
 ## Authentication
 
 All authentication flows end with the same result: a Nextcloud app password
@@ -283,6 +300,7 @@ Implemented environment variables:
 | `NEXTCLOUD_CLI_CONFIG_DIR` | Override the config directory. |
 | `NEXTCLOUD_CLI_KEYRING_BACKEND` | `keyring`, `file`, or unset for automatic keyring with local-file fallback. |
 | `NEXTCLOUD_APP_PASSWORD` | Consumed by `auth add --app-password`. |
+| `NEXTCLOUD_CLI_CA_BUNDLE` | PEM CA bundle added to system trust roots for the current invocation. |
 | `NEXTCLOUD_CLI_LOG_FILE` | Append secret-redacted JSONL audit events for write commands to this file. |
 | `NEXTCLOUD_CLI_AUDIT` | Set to `1` or `true` to write daily JSONL audit logs under the CLI audit directory. |
 

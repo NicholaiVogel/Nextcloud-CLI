@@ -60,6 +60,16 @@ pub enum Error {
         source: url::ParseError,
     },
 
+    #[error("failed to read CA bundle {path}: {source}")]
+    TlsCaBundleRead {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("invalid CA bundle {path}: {message}")]
+    TlsCaBundleInvalid { path: PathBuf, message: String },
+
     #[error("profile `{name}` was not found")]
     ProfileNotFound { name: String },
 
@@ -104,14 +114,170 @@ impl Error {
             Self::ParseXml { .. } => "parse_xml_failed",
             Self::SerializeJson { .. } => "serialize_json_failed",
             Self::InvalidServerUrl { .. } => "invalid_server_url",
+            Self::TlsCaBundleRead { .. } => "tls_ca_bundle_read_failed",
+            Self::TlsCaBundleInvalid { .. } => "tls_ca_bundle_invalid",
             Self::ProfileNotFound { .. } => "profile_not_found",
             Self::NoProfileSelected => "no_profile_selected",
             Self::CredentialNotFound { .. } => "credential_not_found",
             Self::InvalidRemotePath { .. } => "invalid_remote_path",
-            Self::Http(_) => "http_request_failed",
+            Self::Http(error) => classify_tls_error(error).code(),
             Self::HttpStatus { .. } => "http_status_failed",
             Self::OcsStatus { .. } => "ocs_status_failed",
             Self::DownloadSizeMismatch { .. } => "download_size_mismatch",
         }
+    }
+
+    /// Returns an actionable, secret-free hint for errors that benefit from
+    /// operator guidance. The raw reqwest error is intentionally not exposed
+    /// here because it may contain a server URL or other transport detail.
+    pub fn hint(&self) -> Option<&'static str> {
+        match self {
+            Self::Http(error) => Some(classify_tls_error(error).hint()),
+            _ => None,
+        }
+    }
+
+    /// Returns the stable user-facing message for transport failures without
+    /// echoing reqwest's potentially sensitive error text.
+    pub fn safe_message(&self) -> String {
+        match self {
+            Self::Http(error) => classify_tls_error(error).message().to_owned(),
+            _ => self.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TlsErrorKind {
+    CertificateUntrusted,
+    HostnameMismatch,
+    HandshakeFailed,
+    Other,
+}
+
+impl TlsErrorKind {
+    fn code(self) -> &'static str {
+        match self {
+            Self::CertificateUntrusted => "tls_certificate_untrusted",
+            Self::HostnameMismatch => "tls_hostname_mismatch",
+            Self::HandshakeFailed => "tls_handshake_failed",
+            Self::Other => "http_request_failed",
+        }
+    }
+
+    fn message(self) -> &'static str {
+        match self {
+            Self::CertificateUntrusted => {
+                "TLS certificate verification failed because the issuer is not trusted"
+            }
+            Self::HostnameMismatch => "TLS hostname verification failed for the server certificate",
+            Self::HandshakeFailed => "TLS handshake failed while connecting to the server",
+            Self::Other => "network request failed",
+        }
+    }
+
+    fn hint(self) -> &'static str {
+        match self {
+            Self::CertificateUntrusted => {
+                "Provide the issuing CA with --ca-bundle <path> or NEXTCLOUD_CLI_CA_BUNDLE; do not use --insecure unless you explicitly accept disabling TLS verification."
+            }
+            Self::HostnameMismatch => {
+                "Use a server URL whose hostname appears in the certificate SAN; a custom CA bundle does not disable hostname verification."
+            }
+            Self::HandshakeFailed => {
+                "Check the server certificate and TLS configuration; use --ca-bundle <path> for a private CA."
+            }
+            Self::Other => "Check the server URL, network, proxy, and TLS configuration.",
+        }
+    }
+}
+
+fn classify_tls_error(error: &reqwest::Error) -> TlsErrorKind {
+    let message = error.to_string().to_ascii_lowercase();
+    classify_tls_error_message(&message)
+}
+
+fn classify_tls_error_message(message: &str) -> TlsErrorKind {
+    let hostname_mismatch = [
+        "hostname mismatch",
+        "certificate name mismatch",
+        "not valid for",
+        "notvalidforname",
+        "not valid for name",
+        "no matching subject alternative name",
+        "doesn't match certificate",
+        "does not match certificate",
+    ];
+    if hostname_mismatch
+        .iter()
+        .any(|needle| message.contains(needle))
+    {
+        return TlsErrorKind::HostnameMismatch;
+    }
+
+    let untrusted = [
+        "unknown issuer",
+        "unknownissuer",
+        "unknown ca",
+        "unknownca",
+        "self signed",
+        "self-signed",
+        "certificate verify failed",
+        "certificate not trusted",
+        "invalid peer certificate",
+        "unable to get local issuer certificate",
+        "webpki error",
+        "expired",
+        "invalid certificate",
+        "bad certificate",
+    ];
+    if untrusted.iter().any(|needle| message.contains(needle)) {
+        return TlsErrorKind::CertificateUntrusted;
+    }
+
+    let handshake_failure = [
+        "tls handshake",
+        "tls error",
+        "tls alert",
+        "ssl handshake",
+        "ssl error",
+        "handshake",
+        "fatal alert",
+        "protocol_version",
+        "protocol version",
+        "wrong version number",
+    ];
+    if handshake_failure
+        .iter()
+        .any(|needle| message.contains(needle))
+    {
+        return TlsErrorKind::HandshakeFailed;
+    }
+
+    TlsErrorKind::Other
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TlsErrorKind, classify_tls_error_message};
+
+    #[test]
+    fn classifies_certificate_diagnostics_without_exposing_transport_details() {
+        assert_eq!(
+            classify_tls_error_message("certificate verify failed: unknown issuer"),
+            TlsErrorKind::CertificateUntrusted
+        );
+        assert_eq!(
+            classify_tls_error_message("certificate name mismatch"),
+            TlsErrorKind::HostnameMismatch
+        );
+        assert_eq!(
+            classify_tls_error_message("tls handshake failure"),
+            TlsErrorKind::HandshakeFailed
+        );
+        assert_eq!(
+            classify_tls_error_message("connection reset by peer"),
+            TlsErrorKind::Other
+        );
     }
 }

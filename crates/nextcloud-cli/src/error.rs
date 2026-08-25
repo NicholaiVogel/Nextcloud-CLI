@@ -55,6 +55,9 @@ pub enum CliError {
         policy: String,
     },
 
+    #[error("--insecure is not allowed for agent-managed profile `{profile}`")]
+    InsecureAgentMode { profile: String },
+
     #[error("unsupported share creation mode; currently supported: --public")]
     UnsupportedShareCreateMode,
 
@@ -172,6 +175,7 @@ impl CliError {
             Self::ConfirmationRequired => "confirmation_required",
             Self::SensitiveConfirmationRequired { .. } => "confirmation_required",
             Self::PolicyDenied { .. } => "policy_denied",
+            Self::InsecureAgentMode { .. } => "insecure_not_allowed_in_agent_mode",
             Self::UnsupportedShareCreateMode => "unsupported_share_create_mode",
             Self::InvalidExpireDate { .. } => "invalid_expire_date",
             Self::InvalidShareId { .. } => "invalid_share_id",
@@ -216,6 +220,9 @@ impl CliError {
             Self::ConfirmationRequired => 2,
             Self::SensitiveConfirmationRequired { .. } => 2,
             Self::PolicyDenied { .. } => 2,
+            Self::InsecureAgentMode { .. } => 2,
+            Self::Core(nextcloud::Error::TlsCaBundleRead { .. }) => 2,
+            Self::Core(nextcloud::Error::TlsCaBundleInvalid { .. }) => 2,
             Self::UnsupportedShareCreateMode => 2,
             Self::InvalidExpireDate { .. } => 2,
             Self::InvalidShareId { .. } => 2,
@@ -235,6 +242,23 @@ impl CliError {
             Self::Core(nextcloud::Error::HttpStatus { .. }) => 3,
             Self::Core(nextcloud::Error::Http(_)) => 3,
             _ => 1,
+        }
+    }
+
+    pub fn safe_message(&self) -> String {
+        match self {
+            Self::Core(error) => error.safe_message(),
+            _ => self.to_string(),
+        }
+    }
+
+    pub fn hint(&self) -> Option<&'static str> {
+        match self {
+            Self::Core(error) => error.hint(),
+            Self::InsecureAgentMode { .. } => Some(
+                "Use --ca-bundle <path> or NEXTCLOUD_CLI_CA_BUNDLE; --insecure is blocked by agent policy.",
+            ),
+            _ => None,
         }
     }
 }

@@ -101,6 +101,201 @@ fn auth_app_password_requires_password_source() -> Result<(), Box<dyn std::error
 }
 
 #[test]
+fn custom_ca_bundle_path_is_validated_before_network_activity()
+-> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+    let missing = temp.path().join("missing-ca.pem");
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "--ca-bundle",
+            missing.to_str().expect("utf8 path"),
+            "files",
+            "delete",
+            "/Documents/report.md",
+            "--dry-run",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("tls_ca_bundle_read_failed"))
+        .stderr(predicate::str::contains("missing-ca.pem"));
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .env("NEXTCLOUD_CLI_CA_BUNDLE", &missing)
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "files",
+            "mkdir",
+            "/Documents/preview",
+            "--dry-run",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("tls_ca_bundle_read_failed"));
+
+    Ok(())
+}
+
+#[test]
+fn insecure_is_rejected_for_agent_managed_profiles() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+    let config_dir = temp.path().to_str().expect("utf8 path");
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            config_dir,
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "agent",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            config_dir,
+            "profiles",
+            "policy",
+            "set",
+            "agent",
+            "--agent-mode",
+            "true",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            config_dir,
+            "--profile",
+            "agent",
+            "--insecure",
+            "server",
+            "status",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "insecure_not_allowed_in_agent_mode",
+        ))
+        .stderr(predicate::str::contains("ca-bundle"));
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            config_dir,
+            "--profile",
+            "agent",
+            "--insecure",
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "insecure_not_allowed_in_agent_mode",
+        ));
+
+    Ok(())
+}
+
+#[test]
+fn insecure_emits_a_warning_for_non_agent_dry_runs() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+    let config_dir = temp.path().to_str().expect("utf8 path");
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            config_dir,
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            config_dir,
+            "--profile",
+            "personal",
+            "--insecure",
+            "files",
+            "mkdir",
+            "/Documents/preview",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("warning: --insecure"));
+
+    Ok(())
+}
+
+#[test]
 fn nxc_alias_runs_same_binary() -> Result<(), Box<dyn std::error::Error>> {
     Command::cargo_bin("nxc")?
         .args(["commands", "schema"])

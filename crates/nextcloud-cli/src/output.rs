@@ -30,10 +30,14 @@ pub fn print_error(error: &CliError) {
 }
 
 pub fn error_envelope(error: &CliError) -> Value {
-    json!({
+    let mut envelope = json!({
         "error": {
             "code": error.code(),
-            "message": error.to_string()
+            "message": error.safe_message()
         }
-    })
+    });
+    if let Some(hint) = error.hint() {
+        envelope["error"]["hint"] = Value::String(hint.to_owned());
+    }
+    envelope
 }

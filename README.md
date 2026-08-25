@@ -141,6 +141,10 @@ leaking secrets, prefer dry-runs, and summarize private data safely.
 - Destructive commands require `--dry-run` or `--yes`.
 - Public share creation is gated by profile policy.
 - Write audit logs redact secrets.
+- Private CAs are supported with `--ca-bundle <path>` or
+  `NEXTCLOUD_CLI_CA_BUNDLE`; hostname verification remains enabled.
+- `--insecure` is a noisy, non-persistent emergency override and is blocked for
+  agent-managed profiles.
 
 This matters because agents should be useful around private data, and they need
 a smaller blast radius than a raw API token and a prayer.

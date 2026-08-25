@@ -25,6 +25,9 @@ Prefer the short command name `nxc` once it is confirmed available. Use
 - Do not create public shares during setup.
 - Avoid `--insecure`. If a self-signed certificate blocks setup, explain the CA
   fix instead of silently weakening TLS.
+- For an internal CA, use `--ca-bundle <path>` or
+  `NEXTCLOUD_CLI_CA_BUNDLE`; the bundle must be PEM encoded and the hostname
+  must still match the certificate SAN.
 
 ## Install decision order
 
@@ -167,6 +170,9 @@ nxc profiles policy reset personal --yes
 - Checksum mismatch: stop. Do not run the downloaded binary.
 - Login flow timeout: retry or switch to headless app-password setup.
 - Invalid server URL: verify scheme and host with `server status`.
+- TLS certificate failure: inspect the stable TLS error code, add the issuing CA
+  with `--ca-bundle <path>`, and verify that the server hostname is covered by
+  the certificate SAN. Do not normalize `--insecure` as an agent default.
 - Revoked credential: run auth again with a fresh app password.
 - Self-signed TLS: configure a trusted CA or proxy settings. Do not normalize
   `--insecure` as an agent default.

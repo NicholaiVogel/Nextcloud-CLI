@@ -61,6 +61,12 @@ Completed so far:
 - `server status` through `status.php`.
 - `server capabilities` through OCS cloud capabilities, with `--refresh` and
   per-profile cache support.
+- Central TLS options through `--ca-bundle` or `NEXTCLOUD_CLI_CA_BUNDLE`, with
+  custom bundles added to system roots while hostname verification remains
+  enabled.
+- Structured TLS diagnostics for untrusted issuers, hostname mismatches, and
+  handshake failures, plus a noisy command-local `--insecure` escape hatch that
+  agent-managed profiles reject.
 - WebDAV client with PROPFIND, MKCOL, PUT, and GET support.
 - Multistatus XML parser with unit coverage.
 - Remote path normalization and segment encoding with unit coverage.
@@ -702,9 +708,9 @@ Implementation notes:
   `--version` are currently wired.
 - `--format human` currently prints the same structured JSON as `json`; richer
   human formatting remains pending.
-- Global `--dry-run`, `--no-color`, `--quiet`, `--verbose`, `--ca-bundle`,
-  `--insecure`, and `--agent` remain pending. `files mkdir` has command-local
-  `--dry-run`.
+- Global `--dry-run`, `--no-color`, `--quiet`, `--verbose`, and `--agent` remain
+  pending. `--ca-bundle` and `--insecure` are implemented as global,
+  invocation-scoped TLS options. `files mkdir` has command-local `--dry-run`.
 - `auth login`, `auth app-password`, and `auth add` are implemented. `auth login`
   has `--no-open` for SSH sessions where another browser can approve the printed
   URL. `auth app-password --password-stdin` is the fully headless setup path.
@@ -3822,6 +3828,11 @@ Requirements:
 - Use system trust roots by default.
 - Support `--ca-bundle <path>` and `NEXTCLOUD_CLI_CA_BUNDLE` for self-hosted and
   enterprise deployments.
+- Add custom PEM bundle certificates to the system roots rather than replacing
+  them, and continue enforcing certificate hostname/SAN validation.
+- Return stable `tls_certificate_untrusted`, `tls_hostname_mismatch`, and
+  `tls_handshake_failed` diagnostics with a custom-CA hint before any insecure
+  workaround.
 - `--insecure` may exist, but it must be explicit, noisy, non-persistent, and
   test-covered.
 - `--insecure` must be rejected in agent strict mode.

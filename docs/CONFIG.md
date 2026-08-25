@@ -15,6 +15,17 @@ NEXTCLOUD_CLI_CONFIG_DIR=/path/to/config nextcloud-cli config path
 
 `config.json` contains profile metadata only. App passwords are stored through the credential backend and are intentionally excluded from profile output.
 
+TLS overrides are invocation-scoped and are not persisted in `config.json`:
+
+```bash
+nxc --ca-bundle /path/to/ca-bundle.pem --profile personal server status
+NEXTCLOUD_CLI_CA_BUNDLE=/path/to/ca-bundle.pem nxc --profile personal files list /
+```
+
+The CA bundle augments system trust roots and does not disable hostname
+verification. `--insecure` is likewise never persisted and is blocked when the
+selected profile has agent mode enabled.
+
 
 ## Profile selection
 
