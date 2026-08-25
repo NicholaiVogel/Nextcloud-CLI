@@ -25,7 +25,7 @@ pub use auth::{
 };
 pub use calendar::{CalendarClient, CalendarCreateOptions, CalendarEvent, CalendarEventsOptions};
 pub use capabilities::{CapabilitiesClient, ServerCapabilities, ServerStatus};
-pub use client::{ClientAuth, DownloadedBytes, NextcloudClient};
+pub use client::{ClientAuth, DownloadedBytes, NextcloudClient, TlsOptions};
 pub use config_schema::{
     CliConfig, ConfigPaths, ConfigStore, CredentialRef, Profile, ProfilePolicy,
 };

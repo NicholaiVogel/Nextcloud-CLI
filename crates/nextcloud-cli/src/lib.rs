@@ -29,7 +29,8 @@ use credential_store::CredentialStore;
 use error::{CliError, CliResult};
 use nextcloud::{
     AppPasswordClient, CapabilitiesClient, CliConfig, ClientAuth, ConfigPaths, ConfigStore,
-    LoginFlowV2Client, NextcloudClient, Profile, ServerCapabilities, SharesClient, WebDavClient,
+    LoginFlowV2Client, NextcloudClient, Profile, ServerCapabilities, SharesClient, TlsOptions,
+    WebDavClient,
 };
 use output::{print_error, print_success};
 use serde::Serialize;
@@ -60,6 +61,8 @@ async fn run(cli: Cli) -> CliResult<Value> {
     let credential_store = CredentialStore::new(&paths.config_dir);
     let capability_cache = CapabilityCache::new(&paths.cache_dir);
     let selected_profile = selected_profile_name(cli.profile.as_deref());
+    let tls_options = TlsOptions::new(cli.ca_bundle, cli.insecure);
+    reject_insecure_for_selected_profile(&tls_options, &store, selected_profile.as_deref())?;
 
     match cli.command {
         Command::Commands(CommandsCommand::Schema) => {
@@ -74,6 +77,7 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 &store,
                 &credential_store,
                 &capability_cache,
+                &tls_options,
             )
             .await
         }
@@ -84,6 +88,7 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 &store,
                 &credential_store,
                 &capability_cache,
+                &tls_options,
             )
             .await
         }
@@ -93,6 +98,7 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 selected_profile.as_deref(),
                 &store,
                 &credential_store,
+                &tls_options,
             )
             .await
         }
@@ -111,6 +117,7 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 selected_profile.as_deref(),
                 &store,
                 &credential_store,
+                &tls_options,
             )
             .await
         }
@@ -120,6 +127,7 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 selected_profile.as_deref(),
                 &store,
                 &credential_store,
+                &tls_options,
             )
             .await
         }
@@ -129,6 +137,7 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 selected_profile.as_deref(),
                 &store,
                 &credential_store,
+                &tls_options,
             )
             .await
         }
@@ -138,6 +147,7 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 selected_profile.as_deref(),
                 &store,
                 &credential_store,
+                &tls_options,
             )
             .await
         }
@@ -147,6 +157,7 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 selected_profile.as_deref(),
                 &store,
                 &credential_store,
+                &tls_options,
             )
             .await
         }
@@ -156,11 +167,19 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 selected_profile.as_deref(),
                 &store,
                 &credential_store,
+                &tls_options,
             )
             .await
         }
         Command::Smoke(SmokeCommand::Run(args)) => {
-            handle_smoke_run(args, selected_profile.as_deref(), &store, &credential_store).await
+            handle_smoke_run(
+                args,
+                selected_profile.as_deref(),
+                &store,
+                &credential_store,
+                &tls_options,
+            )
+            .await
         }
         Command::Update(UpdateCommand::Check) => json_value(UpdateCheck {
             current_version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -392,11 +411,17 @@ async fn handle_auth(
     store: &ConfigStore,
     credential_store: &CredentialStore,
     capability_cache: &CapabilityCache,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     match command {
         AuthCommand::Login(args) => {
+            ensure_insecure_allowed_for_name(
+                tls_options,
+                store,
+                args.profile.as_deref().or(selected_profile),
+            )?;
             let server = Profile::parse_server(&args.server)?;
-            let client = NextcloudClient::new(server.clone(), None)?;
+            let client = NextcloudClient::new_with_tls_options(server.clone(), None, tls_options)?;
             let login_client = LoginFlowV2Client::new(client);
             let flow = login_client.start().await?;
 
@@ -457,14 +482,20 @@ async fn handle_auth(
             })
         }
         AuthCommand::AppPassword(args) => {
+            ensure_insecure_allowed_for_name(
+                tls_options,
+                store,
+                args.profile.as_deref().or(selected_profile),
+            )?;
             let server = Profile::parse_server(&args.server)?;
             let (account_password, password_source) = read_account_password(&args)?;
-            let client = NextcloudClient::new(
+            let client = NextcloudClient::new_with_tls_options(
                 server.clone(),
                 Some(ClientAuth {
                     username: args.user.clone(),
                     app_password: account_password.to_string(),
                 }),
+                tls_options,
             )?;
             let app_password_client = AppPasswordClient::new(client);
             let credentials = app_password_client.create_app_password().await?;
@@ -500,6 +531,11 @@ async fn handle_auth(
             })
         }
         AuthCommand::Add(args) => {
+            ensure_insecure_allowed_for_name(
+                tls_options,
+                store,
+                args.profile.as_deref().or(selected_profile),
+            )?;
             let app_password = args.app_password.ok_or(CliError::MissingAppPassword)?;
             let server = Profile::parse_server(&args.server)?;
             let profile_name = args
@@ -580,10 +616,11 @@ async fn handle_shares(
     selected_profile: Option<&str>,
     store: &ConfigStore,
     credential_store: &CredentialStore,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     let app_password = credential_store.get_app_password(&profile.credential)?;
-    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let client = client_for_profile(&profile, Some(app_password), tls_options)?;
     let shares_client = SharesClient::new(client);
 
     match command {
@@ -824,10 +861,11 @@ async fn handle_files(
     selected_profile: Option<&str>,
     store: &ConfigStore,
     credential_store: &CredentialStore,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     let app_password = credential_store.get_app_password(&profile.credential)?;
-    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let client = client_for_profile(&profile, Some(app_password), tls_options)?;
     let webdav = WebDavClient::new(client, profile.username.clone());
     let profile_name = profile.name.clone();
     let server = profile.server.to_string();
@@ -1143,10 +1181,11 @@ async fn handle_calendar(
     selected_profile: Option<&str>,
     store: &ConfigStore,
     credential_store: &CredentialStore,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     let app_password = credential_store.get_app_password(&profile.credential)?;
-    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let client = client_for_profile(&profile, Some(app_password), tls_options)?;
     let calendar = nextcloud::CalendarClient::new(client, profile.username.clone());
 
     match command {
@@ -1351,10 +1390,11 @@ async fn handle_contacts(
     selected_profile: Option<&str>,
     store: &ConfigStore,
     credential_store: &CredentialStore,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     let app_password = credential_store.get_app_password(&profile.credential)?;
-    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let client = client_for_profile(&profile, Some(app_password), tls_options)?;
     let contacts = nextcloud::ContactsClient::new(client, profile.username.clone());
 
     match command {
@@ -1538,10 +1578,11 @@ async fn handle_activity(
     selected_profile: Option<&str>,
     store: &ConfigStore,
     credential_store: &CredentialStore,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     let app_password = credential_store.get_app_password(&profile.credential)?;
-    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let client = client_for_profile(&profile, Some(app_password), tls_options)?;
     let activity = nextcloud::ActivityClient::new(client);
 
     match command {
@@ -1569,10 +1610,11 @@ async fn handle_notes(
     selected_profile: Option<&str>,
     store: &ConfigStore,
     credential_store: &CredentialStore,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     let app_password = credential_store.get_app_password(&profile.credential)?;
-    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let client = client_for_profile(&profile, Some(app_password), tls_options)?;
     let notes_client = nextcloud::NotesClient::new(client);
 
     match command {
@@ -1857,10 +1899,11 @@ async fn handle_deck(
     selected_profile: Option<&str>,
     store: &ConfigStore,
     credential_store: &CredentialStore,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     let app_password = credential_store.get_app_password(&profile.credential)?;
-    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let client = client_for_profile(&profile, Some(app_password), tls_options)?;
     let deck = nextcloud::DeckClient::new(client);
 
     match command {
@@ -2307,10 +2350,11 @@ async fn handle_smoke_run(
     selected_profile: Option<&str>,
     store: &ConfigStore,
     credential_store: &CredentialStore,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     let app_password = credential_store.get_app_password(&profile.credential)?;
-    let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+    let client = client_for_profile(&profile, Some(app_password), tls_options)?;
     let mut checks = Vec::new();
 
     let capabilities = CapabilitiesClient::new(client.clone());
@@ -2814,10 +2858,11 @@ async fn handle_server(
     store: &ConfigStore,
     credential_store: &CredentialStore,
     capability_cache: &CapabilityCache,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     let app_password = credential_store.get_app_password(&profile.credential).ok();
-    let client = NextcloudClient::from_profile(&profile, app_password)?;
+    let client = client_for_profile(&profile, app_password, tls_options)?;
     let capabilities = CapabilitiesClient::new(client);
 
     match command {
@@ -2894,6 +2939,79 @@ fn default_profile_name(username: &str, host: Option<&str>) -> String {
         Some(host) => format!("{username}@{host}"),
         None => username.to_owned(),
     }
+}
+
+fn client_for_profile(
+    profile: &Profile,
+    app_password: Option<String>,
+    tls_options: &TlsOptions,
+) -> CliResult<NextcloudClient> {
+    ensure_insecure_allowed(tls_options, Some(profile))?;
+    Ok(NextcloudClient::from_profile_with_tls_options(
+        profile,
+        app_password,
+        tls_options,
+    )?)
+}
+
+fn ensure_insecure_allowed(tls_options: &TlsOptions, profile: Option<&Profile>) -> CliResult<()> {
+    if !tls_options.insecure {
+        return Ok(());
+    }
+
+    if let Some(profile) = profile
+        && profile.policy.agent_mode
+    {
+        return Err(CliError::InsecureAgentMode {
+            profile: profile.name.clone(),
+        });
+    }
+
+    eprintln!(
+        "warning: --insecure disables TLS certificate and hostname verification for this command; prefer --ca-bundle <path>"
+    );
+    Ok(())
+}
+
+fn ensure_insecure_allowed_for_name(
+    tls_options: &TlsOptions,
+    store: &ConfigStore,
+    profile_name: Option<&str>,
+) -> CliResult<()> {
+    if !tls_options.insecure {
+        return Ok(());
+    }
+
+    if let Some(name) = profile_name {
+        let config = store.load()?;
+        if let Some(profile) = config.profiles.get(name) {
+            return ensure_insecure_allowed(tls_options, Some(profile));
+        }
+    }
+
+    ensure_insecure_allowed(tls_options, None)
+}
+
+fn reject_insecure_for_selected_profile(
+    tls_options: &TlsOptions,
+    store: &ConfigStore,
+    profile_name: Option<&str>,
+) -> CliResult<()> {
+    if !tls_options.insecure {
+        return Ok(());
+    }
+
+    if let Some(name) = profile_name {
+        let config = store.load()?;
+        if let Some(profile) = config.profiles.get(name)
+            && profile.policy.agent_mode
+        {
+            return Err(CliError::InsecureAgentMode {
+                profile: profile.name.clone(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn json_value<T>(value: T) -> CliResult<Value>
@@ -3467,7 +3585,7 @@ impl From<&nextcloud::Error> for SmokeError {
             nextcloud::Error::HttpStatus { status, .. } => {
                 format!("server returned HTTP {status}")
             }
-            nextcloud::Error::Http(_) => "network request failed".to_owned(),
+            nextcloud::Error::Http(_) => error.safe_message(),
             nextcloud::Error::OcsStatus {
                 status,
                 status_code,

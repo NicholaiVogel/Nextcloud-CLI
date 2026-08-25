@@ -10,6 +10,12 @@ The current implementation covers auth/profile/server detection, core WebDAV
 file commands, profile-scoped visual media indexing and search, shares, calendar, contacts, Activity, Notes, Deck, smoke checks,
 and update checks:
 
+All commands also accept the global `--profile`, `--config-dir`,
+`--ca-bundle <path>`, and `--insecure` options. `--ca-bundle` can alternatively
+come from `NEXTCLOUD_CLI_CA_BUNDLE`; it augments system trust roots while
+hostname verification remains enabled. `--insecure` is a noisy, non-persistent
+emergency override and is rejected for agent-managed profiles.
+
 - `commands schema`
 - `config path`
 - `config show`

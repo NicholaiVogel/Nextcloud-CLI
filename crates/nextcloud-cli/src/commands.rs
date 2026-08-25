@@ -20,6 +20,16 @@ pub struct Cli {
     #[arg(long, global = true, env = "NEXTCLOUD_CLI_CONFIG_DIR")]
     pub config_dir: Option<PathBuf>,
 
+    /// Add certificates from this PEM bundle to the system trust roots. Hostname
+    /// verification remains enabled.
+    #[arg(long, global = true, env = "NEXTCLOUD_CLI_CA_BUNDLE")]
+    pub ca_bundle: Option<PathBuf>,
+
+    /// Explicitly disable TLS certificate and hostname verification for this
+    /// invocation. Rejected for agent-managed profiles.
+    #[arg(long, global = true, default_value_t = false)]
+    pub insecure: bool,
+
     #[arg(long, global = true, default_value_t = false)]
     pub no_art: bool,
 

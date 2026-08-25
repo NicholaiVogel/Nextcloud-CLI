@@ -25,4 +25,8 @@ url.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
+rcgen.workspace = true
+rustls.workspace = true
+tempfile = "3.13"
 tokio.workspace = true
+tokio-rustls.workspace = true
