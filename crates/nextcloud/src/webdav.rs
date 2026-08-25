@@ -3,6 +3,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::io::Write;
 
 use crate::client::{DownloadedBytes, NextcloudClient};
@@ -25,6 +26,32 @@ impl WebDavClient {
         let base = normalize_remote_path(path)?;
         entries.retain(|entry| entry.path != base);
         Ok(entries)
+    }
+
+    pub async fn walk(&self, path: &str) -> Result<Vec<WebDavEntry>> {
+        let root = normalize_remote_path(path)?;
+        let mut pending = vec![root];
+        let mut visited = HashSet::new();
+        let mut files = Vec::new();
+
+        while let Some(directory) = pending.pop() {
+            if !visited.insert(directory.clone()) {
+                continue;
+            }
+            for entry in self.list(&directory).await? {
+                if entry.is_dir {
+                    pending.push(entry.path);
+                } else {
+                    files.push(entry);
+                }
+            }
+        }
+
+        Ok(files)
+    }
+
+    pub async fn preview(&self, file_id: &str, width: u32, height: u32) -> Result<Vec<u8>> {
+        self.client.preview(file_id, width, height).await
     }
 
     pub async fn stat(&self, path: &str) -> Result<Option<WebDavEntry>> {

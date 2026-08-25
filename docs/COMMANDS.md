@@ -7,7 +7,7 @@ nextcloud-cli commands schema --format json
 ```
 
 The current implementation covers auth/profile/server detection, core WebDAV
-file commands, shares, calendar, contacts, Activity, Notes, Deck, smoke checks,
+file commands, profile-scoped visual media indexing and search, shares, calendar, contacts, Activity, Notes, Deck, smoke checks,
 and update checks:
 
 All commands also accept the global `--profile`, `--config-dir`,
@@ -34,6 +34,11 @@ emergency override and is rejected for agent-managed profiles.
 - `server capabilities [--refresh]`
 - `files list [path]`
 - `files search <query> [--path <scope>] [--limit <n>] [--search-mode name]`
+- `files search-image <local-image> [--path <scope>] [--media images|videos|all] [--limit <n>] [--video-candidates <n>]`
+- `index status`
+- `index build [--path <remote-path>] [--media images|videos|all] [--max-files <n>] [--video-sample-rate <n>]`
+- `index update [--path <remote-path>] [--media images|videos|all] [--max-files <n>] [--video-sample-rate <n>]`
+- `index clear --yes`
 - `files stat <path>`
 - `files mkdir <path> [--parents] [--dry-run]`
 - `files upload <local> <remote> [--overwrite] [--content-type <mime>]`

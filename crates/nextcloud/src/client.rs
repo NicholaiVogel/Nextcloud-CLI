@@ -358,6 +358,22 @@ impl NextcloudClient {
 
     pub async fn request_bytes(&self, method: Method, path: &str) -> Result<Vec<u8>> {
         let url = self.join(path)?;
+        self.request_bytes_url(method, url).await
+    }
+
+    pub async fn preview(&self, file_id: &str, width: u32, height: u32) -> Result<Vec<u8>> {
+        let mut url = self.join("core/preview")?;
+        {
+            let mut query = url.query_pairs_mut();
+            query.append_pair("fileId", file_id);
+            query.append_pair("x", &width.max(1).to_string());
+            query.append_pair("y", &height.max(1).to_string());
+            query.append_pair("a", "1");
+        }
+        self.request_bytes_url(Method::GET, url).await
+    }
+
+    async fn request_bytes_url(&self, method: Method, url: Url) -> Result<Vec<u8>> {
         let mut request = self.http.request(method, url);
         if let Some(auth) = &self.auth {
             request = request.basic_auth(&auth.username, Some(&auth.app_password));

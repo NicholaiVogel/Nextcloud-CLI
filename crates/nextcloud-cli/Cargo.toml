@@ -23,8 +23,10 @@ chrono.workspace = true
 keyring.workspace = true
 clap.workspace = true
 nextcloud = { path = "../nextcloud", version = "0.1.0" }
+nextcloud-index = { path = "../nextcloud-index", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
+tempfile = "3.13"
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true

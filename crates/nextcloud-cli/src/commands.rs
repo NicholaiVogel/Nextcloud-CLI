@@ -64,6 +64,9 @@ pub enum Command {
     Files(FilesCommand),
 
     #[command(subcommand)]
+    Index(IndexCommand),
+
+    #[command(subcommand)]
     Shares(SharesCommand),
 
     #[command(subcommand)]
@@ -230,6 +233,7 @@ pub struct ServerCapabilitiesArgs {
 pub enum FilesCommand {
     List(FilesPathArgs),
     Search(FilesSearchArgs),
+    SearchImage(FilesSearchImageArgs),
     Stat(FilesPathArgs),
     Mkdir(FilesMkdirArgs),
     Upload(FilesUploadArgs),
@@ -255,6 +259,74 @@ pub struct FilesSearchArgs {
 
     #[arg(long, default_value = "name")]
     pub search_mode: String,
+}
+
+#[derive(Debug, Args)]
+pub struct FilesSearchImageArgs {
+    pub query: PathBuf,
+
+    #[arg(long, default_value = "/")]
+    pub path: String,
+
+    #[arg(long, value_enum, default_value_t = IndexMedia::All)]
+    pub media: IndexMedia,
+
+    #[arg(long, default_value_t = 25)]
+    pub limit: u32,
+
+    #[arg(long, default_value_t = 3)]
+    pub video_candidates: u32,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
+pub enum IndexMedia {
+    Images,
+    Videos,
+    All,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum IndexCommand {
+    Status,
+    Build(IndexBuildArgs),
+    Update(IndexUpdateArgs),
+    Clear(IndexClearArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct IndexBuildArgs {
+    #[arg(long, default_value = "/")]
+    pub path: String,
+
+    #[arg(long, value_enum, default_value_t = IndexMedia::All)]
+    pub media: IndexMedia,
+
+    #[arg(long, default_value_t = 10_000)]
+    pub max_files: u32,
+
+    #[arg(long, default_value_t = 1)]
+    pub video_sample_rate: u32,
+}
+
+#[derive(Debug, Args)]
+pub struct IndexUpdateArgs {
+    #[arg(long, default_value = "/")]
+    pub path: String,
+
+    #[arg(long, value_enum, default_value_t = IndexMedia::All)]
+    pub media: IndexMedia,
+
+    #[arg(long, default_value_t = 10_000)]
+    pub max_files: u32,
+
+    #[arg(long, default_value_t = 1)]
+    pub video_sample_rate: u32,
+}
+
+#[derive(Debug, Args)]
+pub struct IndexClearArgs {
+    #[arg(long, default_value_t = false)]
+    pub yes: bool,
 }
 
 #[derive(Debug, Args)]

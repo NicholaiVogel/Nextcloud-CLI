@@ -126,7 +126,8 @@ Current command groups:
 | Auth | `auth login`, `auth app-password`, `auth add`, `auth status` |
 | Profiles | `profiles list`, `profiles show <name>`, `profiles set-default <name>`, `profiles policy show/set/reset` |
 | Server | `server status`, `server capabilities [--refresh]` |
-| Files | `files list`, `files search`, `files stat`, `files mkdir`, `files upload`, `files download`, `files delete` |
+| Files | `files list`, `files search`, `files search-image`, `files stat`, `files mkdir`, `files upload`, `files download`, `files delete` |
+| Index | `index status`, `index build`, `index update`, `index clear --yes` |
 | Shares | `shares list`, `shares create --public`, `shares delete`, `shares revoke` |
 | Calendar | `calendar events`, `calendar create`, `calendar delete` |
 | Contacts | `contacts search`, `contacts create`, `contacts delete` |
@@ -139,7 +140,36 @@ Current command groups:
 See [`COMMANDS.md`](COMMANDS.md) for the generated command list and
 [`SPEC.md`](SPEC.md) for the full target surface.
 
-## Credential handling
+## Visual media search
+
+Visual search is intentionally client-side and explicit. Build a per-profile index
+before querying it; normal file listing and name search never crawl or download
+media implicitly.
+
+```bash
+nxc --profile personal index build \
+  --path /Projects \
+  --media all \
+  --video-sample-rate 1 \
+  --format json
+
+nxc --profile personal files search-image ./reference-frame.png \
+  --path /Projects \
+  --media all \
+  --limit 25 \
+  --format json
+
+nxc --profile personal index update --path /Projects --format json
+nxc --profile personal index status --format json
+nxc --profile personal index clear --yes --format json
+```
+
+Image files are compared with local perceptual fingerprints. Videos are sampled
+with `ffmpeg`, then the best video candidates are refined around their coarse
+match timestamps. Video indexing requires `ffmpeg` in `PATH`. The index stores
+metadata and fingerprints under the local cache directory; original media is only
+held in temporary files while indexing or refining a result.
+
 
 `config.json` stores profile metadata only. App passwords are stored through the
 credential backend.

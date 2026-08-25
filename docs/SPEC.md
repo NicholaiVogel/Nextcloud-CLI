@@ -37,8 +37,9 @@ Last updated: 2026-04-10 after the Phase 1 continuation work.
 The repository now has a working Rust workspace and an initial executable CLI.
 The current implementation covers the repository spine, Login Flow v2, fully
 headless app-password auth, manual app-password auth, profile/config plumbing,
-server status/capability calls with a per-profile cache, and the core WebDAV
-file-transfer and name-search commands. The GitHub repository exists at
+server status/capability calls with a per-profile cache, the core WebDAV
+file-transfer and name-search commands, and an explicit profile-scoped visual
+media index/search slice. The GitHub repository exists at
 <https://github.com/NicholaiVogel/Nextcloud-CLI> and `main` tracks
 `origin/main`.
 
@@ -68,10 +69,15 @@ Completed so far:
   handshake failures, plus a noisy command-local `--insecure` escape hatch that
   agent-managed profiles reject.
 - WebDAV client with PROPFIND, MKCOL, PUT, and GET support.
+- WebDAV recursive walking and authenticated file-ID preview retrieval for visual indexing.
 - Multistatus XML parser with unit coverage.
 - Remote path normalization and segment encoding with unit coverage.
 - `files list`, `files stat`, `files mkdir --parents`, `files upload`,
   `files download`, `files search`, and `files delete --yes`.
+- `index status`, `index build`, `index update`, `index clear --yes`, and
+  `files search-image` for local perceptual image/video-frame matching.
+- Profile-scoped SQLite fingerprint storage with ETag-based incremental updates
+  and temporary-file video extraction through `ffmpeg`.
 - Command metadata through `commands schema`.
 - Marketing-focused README plus `docs/USAGE.md`, `docs/COMMANDS.md`,
   `docs/CONFIG.md`, `docs/INSTALL.md`, `docs/NETWORK.md`,
@@ -2968,7 +2974,8 @@ There are two different content-search strategies:
 
 These strategies must not be blurred together. Remote search depends on server
 capabilities. Local search depends on client-side indexing, local storage policy,
-profile policy, and user consent.
+profile policy, and user consent. Visual similarity is a third, deliberately
+separate local-media operation: server text-search APIs are not pixel-search APIs.
 
 ### 23.1 Search modes
 
@@ -3115,7 +3122,7 @@ Local index goals:
 - explicit consent before content extraction
 - profile-policy enforcement before every indexed download or text extraction
 
-Future local index commands:
+Local index lifecycle commands:
 
 ```bash
 nextcloud-cli index status [--profile <profile>]
@@ -3123,6 +3130,54 @@ nextcloud-cli index build [--path <remote-path>] [--profile <profile>]
 nextcloud-cli index update [--profile <profile>]
 nextcloud-cli index clear [--profile <profile>] [--yes]
 ```
+
+The implemented visual-media commands are:
+
+```bash
+nextcloud-cli files search-image <local-image> \
+  [--path <remote-scope>] [--media images|videos|all] \
+  [--limit <n>] [--video-candidates <n>]
+nextcloud-cli index build [--path <remote-path>] [--media images|videos|all]
+nextcloud-cli index update [--path <remote-path>] [--media images|videos|all]
+```
+
+### 23.6.1 Visual media index
+
+Visual indexing is always explicit. `files list`, filename search, setup, and
+ordinary profile use never download or fingerprint media implicitly. `index build`
+creates a profile-scoped SQLite database under the resolved local cache directory;
+`index update` requires that database to exist and reuses rows whose file id and
+ETag are unchanged. `index clear --yes` removes the complete profile index.
+
+The index stores remote metadata plus frame fingerprints, not permanent copies of
+the original media. Image entries use a preview fetched through Nextcloud's
+file-ID preview route when available, with an authenticated WebDAV download as a
+fallback. Video entries are downloaded to a temporary file, sampled with
+`ffmpeg`, and stored as timestamped frame fingerprints. Video search first ranks
+the sampled frames, then downloads and samples a short window around the strongest
+video candidates at a higher rate before returning results.
+
+The first matcher is intentionally dependency-light and deterministic:
+
+- 64-bit perceptual hash for broad visual similarity
+- 64-bit difference hash for edge/layout similarity
+- average RGB distance as a coarse color signal
+- a normalized `0.0` to `1.0` score with component distances in the result
+
+This is useful for near-duplicate screenshots, resized exports, stills, and
+frames in editorial videos. It is not semantic search: a natural-language query,
+object recognition, or a visually unrelated but conceptually similar image needs
+a future embedding backend and an explicit model/privacy policy.
+
+Video indexing requires `ffmpeg` in `PATH`. `--video-sample-rate` controls the
+initial frames-per-second sample and is bounded to `1..=60`. `--max-files`
+defaults to `10,000`; callers should narrow `--path` for large libraries. Search
+scope is path-boundary aware, so `/J305` does not match `/J305-old`.
+
+The visual search result reports `backend: "local_media_index"`, the selected
+profile, remote scope, query path, media selection, result limit, and results with
+remote path, media kind, optional video timestamp, similarity score, and distance
+components. Results are deduplicated to one best frame per remote file.
 
 `files search --search-mode local` uses this index. If the index has not been
 built, return:
@@ -3143,8 +3198,9 @@ not the first implementation step. It should focus on explicit markdown vaults,
 notes, links, headings, tags, backlinks, and references. This should be written as
 its own implementation spec before coding.
 
-Local index is not required for the first issue-complete MVP unless explicitly
-pulled into scope. The MVP must still avoid blocking it architecturally.
+Generic local text search is still a later layer. The visual-media slice above is
+implemented without claiming that `files search --search-mode local` can search
+text content yet.
 
 ### 23.7 Search completion gate
 
