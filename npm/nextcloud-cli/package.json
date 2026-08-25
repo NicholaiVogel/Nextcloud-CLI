@@ -1,6 +1,6 @@
 {
   "name": "nextcloud-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Unofficial client-side Nextcloud CLI for humans, scripts, and AI agents.",
   "license": "MIT",
   "homepage": "https://github.com/NicholaiVogel/Nextcloud-CLI#readme",

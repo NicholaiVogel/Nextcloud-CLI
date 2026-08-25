@@ -14,7 +14,7 @@ archive matching your host triple from
 the checksum, then place both binaries on your `PATH`.
 
 ```bash
-version=0.1.0
+version=0.1.1
 host=x86_64-unknown-linux-gnu
 base="nextcloud-cli-${version}-${host}"
 
@@ -48,7 +48,7 @@ curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/in
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/install.sh | NEXTCLOUD_CLI_INSTALL_VERSION=0.1.0 sh
+curl -fsSL https://raw.githubusercontent.com/NicholaiVogel/Nextcloud-CLI/main/install.sh | NEXTCLOUD_CLI_INSTALL_VERSION=0.1.1 sh
 ```
 
 ## npm wrapper

@@ -1152,7 +1152,7 @@ checksum = "27b02d87554356db9e9a873add8782d4ea6e3e58ea071a9adb9a2e8ddb884a8b"
 
 [[package]]
 name = "nextcloud"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "dirs",
@@ -1174,7 +1174,7 @@ dependencies = [
 
 [[package]]
 name = "nextcloud-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1198,7 +1198,7 @@ dependencies = [
 
 [[package]]
 name = "nextcloud-index"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "image",
  "rusqlite",
