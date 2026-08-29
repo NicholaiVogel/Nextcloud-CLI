@@ -66,7 +66,7 @@ It gives you:
 
 | Area | Current support |
 | --- | --- |
-| Files | List, name-search, visual-search, stat, mkdir, upload, download, guarded delete |
+| Files | List, name-search, visual-search, stat, mkdir, upload, download, move, rename, copy, guarded delete |
 | Shares | List, create public links, delete, revoke, preview sensitive actions |
 | Calendar | List events, create events, guarded delete |
 | Contacts | Search, create, guarded delete |

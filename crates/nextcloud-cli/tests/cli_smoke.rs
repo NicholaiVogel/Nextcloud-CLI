@@ -33,6 +33,9 @@ fn commands_schema_is_json() -> Result<(), Box<dyn std::error::Error>> {
         "index build",
         "index update",
         "index clear",
+        "files move",
+        "files rename",
+        "files copy",
     ] {
         assert!(
             value["commands"]
@@ -402,6 +405,78 @@ fn files_delete_requires_confirmation() -> Result<(), Box<dyn std::error::Error>
         .failure()
         .code(2)
         .stderr(predicate::str::contains("confirmation_required"));
+
+    Ok(())
+}
+
+#[test]
+fn files_move_copy_and_rename_dry_run_resolve_destinations_without_network()
+-> Result<(), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+    let config_dir = temp.path().to_str().expect("utf8 path");
+
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            config_dir,
+            "auth",
+            "add",
+            "--server",
+            "https://cloud.example.com",
+            "--user",
+            "nicholai",
+            "--profile",
+            "personal",
+            "--app-password",
+            "super-secret",
+        ])
+        .assert()
+        .success();
+
+    for (command, expected_operation, expected_source, expected_destination) in [
+        (
+            vec!["move", "/incoming/PLATES", "/input/PLATES", "--dry-run"],
+            "move",
+            "/incoming/PLATES",
+            "/input/PLATES",
+        ),
+        (
+            vec!["copy", "/input/PLATES", "/archive/PLATES", "--dry-run"],
+            "copy",
+            "/input/PLATES",
+            "/archive/PLATES",
+        ),
+        (
+            vec!["rename", "/archive/PLATES", "FINAL", "--dry-run"],
+            "rename",
+            "/archive/PLATES",
+            "/archive/FINAL",
+        ),
+    ] {
+        let output = Command::cargo_bin("nextcloud-cli")?
+            .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+            .args(["--config-dir", config_dir, "--profile", "personal", "files"])
+            .args(command)
+            .output()?;
+        assert!(output.status.success());
+        let value: Value = serde_json::from_slice(&output.stdout)?;
+        assert_eq!(value["operation"], expected_operation);
+        assert_eq!(value["source"], expected_source);
+        assert_eq!(value["destination"], expected_destination);
+        assert_eq!(value["dry_run"], true);
+        assert_eq!(value["completed"], false);
+        assert_eq!(
+            value["source_url"],
+            format!("https://cloud.example.com/remote.php/dav/files/nicholai{expected_source}")
+        );
+        assert_eq!(
+            value["destination_url"],
+            format!(
+                "https://cloud.example.com/remote.php/dav/files/nicholai{expected_destination}"
+            )
+        );
+    }
 
     Ok(())
 }

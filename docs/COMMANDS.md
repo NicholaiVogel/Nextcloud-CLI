@@ -43,6 +43,9 @@ emergency override and is rejected for agent-managed profiles.
 - `files mkdir <path> [--parents] [--dry-run]`
 - `files upload <local> <remote> [--overwrite] [--content-type <mime>]`
 - `files download <remote> <local> [--overwrite]`
+- `files move <from> <to> [--overwrite] [--dry-run]`
+- `files rename <path> <new-name> [--overwrite] [--dry-run]`
+- `files copy <from> <to> [--overwrite] [--dry-run]`
 - `files delete <path> [--dry-run] --yes`
 - `shares list [--path <path>] [--shared-with-me] [--include-tags]`
 - `shares create <path> --public [--password <password>] [--expire-date <yyyy-mm-dd>] [--dry-run] [--yes]`

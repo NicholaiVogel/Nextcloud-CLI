@@ -238,6 +238,9 @@ pub enum FilesCommand {
     Mkdir(FilesMkdirArgs),
     Upload(FilesUploadArgs),
     Download(FilesDownloadArgs),
+    Move(FilesTransferArgs),
+    Rename(FilesRenameArgs),
+    Copy(FilesTransferArgs),
     Delete(FilesDeleteArgs),
 }
 
@@ -361,6 +364,32 @@ pub struct FilesDownloadArgs {
 
     #[arg(long, default_value_t = false)]
     pub overwrite: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct FilesTransferArgs {
+    pub from: String,
+
+    pub to: String,
+
+    #[arg(long, default_value_t = false)]
+    pub overwrite: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct FilesRenameArgs {
+    pub path: String,
+
+    pub new_name: String,
+
+    #[arg(long, default_value_t = false)]
+    pub overwrite: bool,
+
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]

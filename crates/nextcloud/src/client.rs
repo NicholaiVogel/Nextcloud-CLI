@@ -356,6 +356,33 @@ impl NextcloudClient {
         Ok(body)
     }
 
+    pub async fn request_webdav_transfer(
+        &self,
+        method: Method,
+        path: &str,
+        destination: &Url,
+        overwrite: bool,
+    ) -> Result<()> {
+        let url = self.join(path)?;
+        let mut request = self
+            .http
+            .request(method, url)
+            .header("Destination", destination.as_str())
+            .header("Overwrite", if overwrite { "T" } else { "F" });
+        if let Some(auth) = &self.auth {
+            request = request.basic_auth(&auth.username, Some(&auth.app_password));
+        }
+
+        let response = request.send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_else(|_| String::new());
+            return Err(Error::HttpStatus { status, body });
+        }
+
+        Ok(())
+    }
+
     pub async fn request_bytes(&self, method: Method, path: &str) -> Result<Vec<u8>> {
         let url = self.join(path)?;
         self.request_bytes_url(method, url).await
