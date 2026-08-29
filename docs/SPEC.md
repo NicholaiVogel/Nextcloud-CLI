@@ -76,8 +76,8 @@ Completed so far:
   `files download`, `files search`, and `files delete --yes`.
 - `index status`, `index build`, `index update`, `index clear --yes`, and
   `files search-image` for local perceptual image/video-frame matching.
-- Profile-scoped SQLite fingerprint storage with ETag-based incremental updates
-  and temporary-file video extraction through `ffmpeg`.
+- Profile-scoped SQLite fingerprint storage with ETag-based incremental updates,
+  streaming WebDAV-to-`ffmpeg` video extraction, and bounded image fallbacks.
 - Command metadata through `commands schema`.
 - Marketing-focused README plus `docs/USAGE.md`, `docs/COMMANDS.md`,
   `docs/CONFIG.md`, `docs/INSTALL.md`, `docs/NETWORK.md`,
@@ -3138,7 +3138,9 @@ nextcloud-cli files search-image <local-image> \
   [--path <remote-scope>] [--media images|videos|all] \
   [--limit <n>] [--video-candidates <n>]
 nextcloud-cli index build [--path <remote-path>] [--media images|videos|all]
+  [--max-files <n>] [--video-sample-rate <n>] [--scratch-dir <dir>]
 nextcloud-cli index update [--path <remote-path>] [--media images|videos|all]
+  [--max-files <n>] [--video-sample-rate <n>] [--scratch-dir <dir>]
 ```
 
 ### 23.6.1 Visual media index
@@ -3151,11 +3153,20 @@ ETag are unchanged. `index clear --yes` removes the complete profile index.
 
 The index stores remote metadata plus frame fingerprints, not permanent copies of
 the original media. Image entries use a preview fetched through Nextcloud's
-file-ID preview route when available, with an authenticated WebDAV download as a
-fallback. Video entries are downloaded to a temporary file, sampled with
-`ffmpeg`, and stored as timestamped frame fingerprints. Video search first ranks
-the sampled frames, then downloads and samples a short window around the strongest
-video candidates at a higher rate before returning results.
+file-ID preview route when available. If preview generation is unavailable, the
+authenticated WebDAV fallback is written to a caller-selected scratch directory
+and is hard-capped at 64 MiB; the temporary file is removed after fingerprinting.
+Video entries stream authenticated WebDAV bytes directly into `ffmpeg` stdin and
+read fixed-size raw RGB frames one at a time. No source-video or decoded-frame
+cache is written. Video search first ranks the sampled frames, then streams and
+samples a short window around the strongest video candidates at a higher rate
+before returning results.
+
+The recursive scan keeps only the pending directory stack, the current WebDAV
+directory response, and the compact SQLite index in memory. Each invocation has a
+run marker. Files seen during the run update that marker; rows are pruned only
+after a complete `--media all` scan, so an interrupted or failed run leaves the
+previous index available and the next run can skip unchanged ETags.
 
 The first matcher is intentionally dependency-light and deterministic:
 
@@ -3170,9 +3181,12 @@ object recognition, or a visually unrelated but conceptually similar image needs
 a future embedding backend and an explicit model/privacy policy.
 
 Video indexing requires `ffmpeg` in `PATH`. `--video-sample-rate` controls the
-initial frames-per-second sample and is bounded to `1..=60`. `--max-files`
-defaults to `10,000`; callers should narrow `--path` for large libraries. Search
-scope is path-boundary aware, so `/J305` does not match `/J305-old`.
+initial frames-per-second sample and is bounded to `1..=60`. There is no small
+implicit file cap; pass `--max-files` when deliberately bounding a run. Use
+`--scratch-dir <dir>` or `NEXTCLOUD_CLI_INDEX_SCRATCH` to select the owner-only
+scratch directory for bounded image fallbacks. For very large libraries, start
+with a deliberate `--path` and media selection rather than a blind root scan.
+Search scope is path-boundary aware, so `/J305` does not match `/J305-old`.
 
 The visual search result reports `backend: "local_media_index"`, the selected
 profile, remote scope, query path, media selection, result limit, and results with

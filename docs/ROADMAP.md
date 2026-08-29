@@ -140,11 +140,12 @@ nxc --profile personal index status
 nxc --profile personal index clear --yes
 ```
 
-Images use local perceptual fingerprints. Videos are sampled with `ffmpeg`, then
-the strongest candidates are refined around their coarse match timestamps. The
-index is opt-in, profile-scoped, incremental by WebDAV metadata/ETag, and stored
-in the local cache. Original media is downloaded only to temporary files while
-it is being fingerprinted. Semantic embeddings and natural-language image search
+Images use local perceptual fingerprints. Videos stream from WebDAV into `ffmpeg`
+stdin and decoded frames are fingerprinted one at a time; source videos and frame
+files are not cached. The strongest candidates are refined around their coarse
+match timestamps. The index is opt-in, profile-scoped, incremental by WebDAV
+metadata/ETag, and stored in the local cache. Only bounded image-preview
+fallbacks use temporary files. Semantic embeddings and natural-language image search
 remain future work because they introduce model distribution, CPU/GPU, and
 privacy trade-offs that this CLI should not impose by default.
 

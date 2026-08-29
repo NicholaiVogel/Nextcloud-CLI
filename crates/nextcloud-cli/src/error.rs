@@ -25,6 +25,12 @@ pub enum CliError {
     #[error("video frame extraction failed: {message}")]
     VideoExtractionFailed { message: String },
 
+    #[error("index scratch directory {path} is unavailable: {message}")]
+    IndexScratchUnavailable { path: PathBuf, message: String },
+
+    #[error("index fallback media exceeds the bounded scratch limit of {limit} bytes")]
+    IndexScratchLimitExceeded { limit: u64 },
+
     #[error("app password is required; pass --app-password or set NEXTCLOUD_APP_PASSWORD")]
     MissingAppPassword,
 
@@ -187,6 +193,8 @@ impl CliError {
             Self::IndexLimitExceeded { .. } => "index_limit_exceeded",
             Self::VideoToolUnavailable => "video_tool_unavailable",
             Self::VideoExtractionFailed { .. } => "video_extraction_failed",
+            Self::IndexScratchUnavailable { .. } => "index_scratch_unavailable",
+            Self::IndexScratchLimitExceeded { .. } => "index_scratch_limit_exceeded",
             Self::MissingAppPassword => "missing_app_password",
             Self::MissingAccountPassword => "missing_account_password",
             Self::PasswordEnvMissing { .. } => "password_env_missing",

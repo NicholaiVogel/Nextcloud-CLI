@@ -301,11 +301,14 @@ pub struct IndexBuildArgs {
     #[arg(long, value_enum, default_value_t = IndexMedia::All)]
     pub media: IndexMedia,
 
-    #[arg(long, default_value_t = 10_000)]
+    #[arg(long, default_value_t = u32::MAX, hide_default_value = true)]
     pub max_files: u32,
 
     #[arg(long, default_value_t = 1)]
     pub video_sample_rate: u32,
+
+    #[arg(long, env = "NEXTCLOUD_CLI_INDEX_SCRATCH", value_name = "DIR")]
+    pub scratch_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -316,11 +319,14 @@ pub struct IndexUpdateArgs {
     #[arg(long, value_enum, default_value_t = IndexMedia::All)]
     pub media: IndexMedia,
 
-    #[arg(long, default_value_t = 10_000)]
+    #[arg(long, default_value_t = u32::MAX, hide_default_value = true)]
     pub max_files: u32,
 
     #[arg(long, default_value_t = 1)]
     pub video_sample_rate: u32,
+
+    #[arg(long, env = "NEXTCLOUD_CLI_INDEX_SCRATCH", value_name = "DIR")]
+    pub scratch_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

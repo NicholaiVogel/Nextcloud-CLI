@@ -179,6 +179,25 @@ fn custom_ca_bundle_path_is_validated_before_network_activity()
         .code(2)
         .stderr(predicate::str::contains("tls_ca_bundle_read_failed"));
 
+    Command::cargo_bin("nextcloud-cli")?
+        .env("NEXTCLOUD_CLI_KEYRING_BACKEND", "file")
+        .args([
+            "--config-dir",
+            temp.path().to_str().expect("utf8 path"),
+            "--profile",
+            "personal",
+            "--ca-bundle",
+            missing.to_str().expect("utf8 path"),
+            "index",
+            "build",
+            "--max-files",
+            "1",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("tls_ca_bundle_read_failed"));
+
     Ok(())
 }
 
@@ -464,7 +483,8 @@ fn visual_search_help_is_wired() -> Result<(), Box<dyn std::error::Error>> {
         .assert()
         .success()
         .stdout(predicate::str::contains("--video-sample-rate"))
-        .stdout(predicate::str::contains("--max-files"));
+        .stdout(predicate::str::contains("--max-files"))
+        .stdout(predicate::str::contains("--scratch-dir"));
 
     Ok(())
 }
