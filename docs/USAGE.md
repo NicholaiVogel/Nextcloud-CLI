@@ -151,6 +151,7 @@ nxc --profile personal index build \
   --path /Projects \
   --media all \
   --video-sample-rate 1 \
+  --scratch-dir /mnt/work/hermes-scratch/nxc-index \
   --format json
 
 nxc --profile personal files search-image ./reference-frame.png \
@@ -164,11 +165,15 @@ nxc --profile personal index status --format json
 nxc --profile personal index clear --yes --format json
 ```
 
-Image files are compared with local perceptual fingerprints. Videos are sampled
-with `ffmpeg`, then the best video candidates are refined around their coarse
-match timestamps. Video indexing requires `ffmpeg` in `PATH`. The index stores
-metadata and fingerprints under the local cache directory; original media is only
-held in temporary files while indexing or refining a result.
+Image files are compared with local perceptual fingerprints. Videos are streamed
+from WebDAV into `ffmpeg` and emit one fixed-size raw frame at a time; neither the
+source video nor decoded frame files are cached. Images use the Nextcloud preview
+route when available and otherwise use a bounded temporary fallback capped at
+64 MiB. Set `--scratch-dir` or `NEXTCLOUD_CLI_INDEX_SCRATCH` for that fallback.
+The index stores only remote metadata and compact fingerprints under the local
+cache directory. The recursive scan materializes one directory listing at a time;
+ETag matches are skipped, and run markers make pruning safe only after a complete
+traversal, so an interrupted run leaves the prior index available.
 
 
 `config.json` stores profile metadata only. App passwords are stored through the

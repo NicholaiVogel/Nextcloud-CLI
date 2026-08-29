@@ -1,7 +1,6 @@
 use image::{DynamicImage, GenericImageView, imageops::FilterType};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
-use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -233,6 +232,22 @@ pub fn fingerprint_image_bytes(bytes: &[u8], label: impl Into<String>) -> Result
     Ok(fingerprint_image(&image))
 }
 
+pub fn fingerprint_rgb8(
+    bytes: &[u8],
+    width: u32,
+    height: u32,
+    label: impl Into<String>,
+) -> Result<FrameFingerprint> {
+    let label = label.into();
+    let image = image::RgbImage::from_raw(width, height, bytes.to_vec()).ok_or_else(|| {
+        Error::DecodeImage {
+            label,
+            message: format!("expected an RGB frame of {width}x{height}"),
+        }
+    })?;
+    Ok(fingerprint_image(&DynamicImage::ImageRgb8(image)))
+}
+
 pub fn fingerprint_image_file(path: &Path) -> Result<FrameFingerprint> {
     let bytes = fs::read(path).map_err(|source| Error::ReadImage {
         path: path.to_path_buf(),
@@ -306,7 +321,8 @@ impl IndexDatabase {
                 size INTEGER,
                 etag TEXT,
                 modified_at TEXT,
-                indexed_at INTEGER NOT NULL
+                indexed_at INTEGER NOT NULL,
+                last_seen_run INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS frames (
                 file_id TEXT NOT NULL,
@@ -323,8 +339,30 @@ impl IndexDatabase {
             );
             CREATE INDEX IF NOT EXISTS frames_file_id_idx ON frames(file_id);
             CREATE INDEX IF NOT EXISTS files_path_idx ON files(path);
-            INSERT INTO index_meta(key, value) VALUES ('schema_version', '1')
+            INSERT INTO index_meta(key, value) VALUES ('schema_version', '2')
                 ON CONFLICT(key) DO NOTHING;",
+        )?;
+        let has_last_seen_run = {
+            let mut statement = connection.prepare("PRAGMA table_info(files)")?;
+            let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+            columns
+                .collect::<rusqlite::Result<Vec<_>>>()?
+                .into_iter()
+                .any(|column| column == "last_seen_run")
+        };
+        if !has_last_seen_run {
+            connection.execute(
+                "ALTER TABLE files ADD COLUMN last_seen_run INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS files_last_seen_run_idx ON files(last_seen_run)",
+            [],
+        )?;
+        connection.execute(
+            "UPDATE index_meta SET value = '2' WHERE key = 'schema_version'",
+            [],
         )?;
         set_owner_only_file(path).map_err(|source| Error::SetPermissions {
             path: path.to_path_buf(),
@@ -389,7 +427,19 @@ impl IndexDatabase {
         })
     }
 
+    pub fn begin_run(&self) -> u64 {
+        unix_timestamp_nanos()
+    }
+
     pub fn upsert_file(&mut self, file: &IndexedFile) -> Result<IndexedFileState> {
+        self.upsert_file_seen(file, 0)
+    }
+
+    pub fn upsert_file_seen(
+        &mut self,
+        file: &IndexedFile,
+        run_id: u64,
+    ) -> Result<IndexedFileState> {
         let existing = self
             .connection
             .query_row(
@@ -424,8 +474,8 @@ impl IndexDatabase {
                 });
         let now = unix_timestamp();
         self.connection.execute(
-            "INSERT INTO files(file_id, path, name, kind, mime_type, size, etag, modified_at, indexed_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "INSERT INTO files(file_id, path, name, kind, mime_type, size, etag, modified_at, indexed_at, last_seen_run)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
              ON CONFLICT(file_id) DO UPDATE SET
                  path = excluded.path,
                  name = excluded.name,
@@ -434,7 +484,8 @@ impl IndexDatabase {
                  size = excluded.size,
                  etag = excluded.etag,
                  modified_at = excluded.modified_at,
-                 indexed_at = excluded.indexed_at",
+                 indexed_at = excluded.indexed_at,
+                 last_seen_run = excluded.last_seen_run",
             params![
                 file.file_id,
                 file.path,
@@ -445,6 +496,7 @@ impl IndexDatabase {
                 file.etag,
                 file.modified_at,
                 now,
+                i64::try_from(run_id).unwrap_or(i64::MAX),
             ],
         )?;
         if !unchanged {
@@ -497,36 +549,24 @@ impl IndexDatabase {
         Ok(())
     }
 
-    pub fn prune_missing_under(
-        &mut self,
-        root: &str,
-        seen_file_ids: &HashSet<String>,
-    ) -> Result<u64> {
+    pub fn prune_missing_under(&mut self, root: &str, run_id: u64) -> Result<u64> {
         let root = root.trim_end_matches('/');
-        let mut stale = Vec::new();
-        let mut statement = self.connection.prepare("SELECT file_id, path FROM files")?;
-        let rows = statement.query_map([], |row| {
-            Ok(FilePath {
-                file_id: row.get(0)?,
-                path: row.get(1)?,
-            })
-        })?;
-        for row in rows {
-            let row = row?;
-            let in_scope = root.is_empty()
-                || root == "/"
-                || row.path == root
-                || row.path.starts_with(&format!("{root}/"));
-            if in_scope && !seen_file_ids.contains(&row.file_id) {
-                stale.push(row.file_id);
-            }
-        }
-        drop(statement);
-        for file_id in &stale {
-            self.connection
-                .execute("DELETE FROM files WHERE file_id = ?1", params![file_id])?;
-        }
-        Ok(stale.len() as u64)
+        let prefix = if root.is_empty() {
+            "/".to_owned()
+        } else {
+            format!("{root}/")
+        };
+        let removed = self.connection.execute(
+            "DELETE FROM files
+             WHERE last_seen_run <> ?1
+               AND (path = ?2 OR substr(path, 1, length(?3)) = ?3)",
+            params![
+                i64::try_from(run_id).unwrap_or(i64::MAX),
+                if root.is_empty() { "/" } else { root },
+                prefix,
+            ],
+        )?;
+        Ok(removed as u64)
     }
 
     pub fn search(
@@ -712,6 +752,13 @@ fn unix_timestamp() -> u64 {
         .unwrap_or_default()
 }
 
+fn unix_timestamp_nanos() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos().min(u128::from(u64::MAX)) as u64)
+        .unwrap_or_default()
+}
+
 fn set_owner_only_directory(path: &Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {
@@ -734,6 +781,7 @@ fn set_owner_only_file(path: &Path) -> std::io::Result<()> {
 mod tests {
     use super::*;
     use image::{ImageBuffer, Rgb};
+    use rusqlite::Connection;
     use tempfile::TempDir;
 
     #[test]
@@ -803,6 +851,61 @@ mod tests {
         };
         assert!(!database.upsert_file(&changed)?.unchanged);
         assert_eq!(database.status()?.frame_count, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn run_markers_prune_without_collecting_file_ids() -> Result<()> {
+        let temp = TempDir::new().expect("temp dir");
+        let path = temp.path().join("index.sqlite");
+        let mut database = IndexDatabase::open(&path)?;
+        let file = |file_id: &str, path: &str| IndexedFile {
+            file_id: file_id.to_owned(),
+            path: path.to_owned(),
+            name: file_id.to_owned(),
+            kind: MediaKind::Image,
+            mime_type: Some("image/png".to_owned()),
+            size: Some(10),
+            etag: Some(file_id.to_owned()),
+            modified_at: None,
+        };
+        let first_run = database.begin_run();
+        database.upsert_file_seen(&file("one", "/one.png"), first_run)?;
+        database.replace_frames("one", &[])?;
+        database.upsert_file_seen(&file("two", "/two.png"), first_run)?;
+        database.replace_frames("two", &[])?;
+
+        let second_run = first_run + 1;
+        database.upsert_file_seen(&file("one", "/one.png"), second_run)?;
+        assert_eq!(database.prune_missing_under("/", second_run)?, 1);
+        assert_eq!(database.status()?.file_count, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_schema_is_upgraded_with_run_markers() -> Result<()> {
+        let temp = TempDir::new().expect("temp dir");
+        let path = temp.path().join("index.sqlite");
+        let connection = Connection::open(&path)?;
+        connection.execute_batch(
+            "CREATE TABLE index_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+             CREATE TABLE files (
+                 file_id TEXT PRIMARY KEY NOT NULL,
+                 path TEXT NOT NULL,
+                 name TEXT NOT NULL,
+                 kind TEXT NOT NULL,
+                 mime_type TEXT,
+                 size INTEGER,
+                 etag TEXT,
+                 modified_at TEXT,
+                 indexed_at INTEGER NOT NULL
+             );
+             INSERT INTO index_meta(key, value) VALUES ('schema_version', '1');",
+        )?;
+        drop(connection);
+
+        let database = IndexDatabase::open(&path)?;
+        assert_eq!(database.status()?.schema_version, 2);
         Ok(())
     }
 

@@ -108,6 +108,7 @@ async fn run(cli: Cli) -> CliResult<Value> {
                 selected_profile.as_deref(),
                 &store,
                 &credential_store,
+                &tls_options,
             )
             .await
         }
@@ -1115,6 +1116,7 @@ async fn handle_index(
     selected_profile: Option<&str>,
     store: &ConfigStore,
     credential_store: &CredentialStore,
+    tls_options: &TlsOptions,
 ) -> CliResult<Value> {
     let profile = store.selected_profile(selected_profile)?;
     match command {
@@ -1122,26 +1124,28 @@ async fn handle_index(
         IndexCommand::Clear(args) => visual_search::clear_index(store.paths(), &profile, args.yes),
         IndexCommand::Build(args) => {
             let app_password = credential_store.get_app_password(&profile.credential)?;
-            let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+            let client = client_for_profile(&profile, Some(app_password), tls_options)?;
             let webdav = WebDavClient::new(client, profile.username.clone());
             let options = visual_search::IndexOptions {
                 root: args.path,
                 media: args.media,
                 max_files: args.max_files,
                 video_sample_rate: args.video_sample_rate,
+                scratch_dir: args.scratch_dir,
                 update_only: false,
             };
             visual_search::build_index(&webdav, store.paths(), &profile, &options).await
         }
         IndexCommand::Update(args) => {
             let app_password = credential_store.get_app_password(&profile.credential)?;
-            let client = NextcloudClient::from_profile(&profile, Some(app_password))?;
+            let client = client_for_profile(&profile, Some(app_password), tls_options)?;
             let webdav = WebDavClient::new(client, profile.username.clone());
             let options = visual_search::IndexOptions {
                 root: args.path,
                 media: args.media,
                 max_files: args.max_files,
                 video_sample_rate: args.video_sample_rate,
+                scratch_dir: args.scratch_dir,
                 update_only: true,
             };
             visual_search::build_index(&webdav, store.paths(), &profile, &options).await

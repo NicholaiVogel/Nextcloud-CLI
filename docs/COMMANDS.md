@@ -36,8 +36,8 @@ emergency override and is rejected for agent-managed profiles.
 - `files search <query> [--path <scope>] [--limit <n>] [--search-mode name]`
 - `files search-image <local-image> [--path <scope>] [--media images|videos|all] [--limit <n>] [--video-candidates <n>]`
 - `index status`
-- `index build [--path <remote-path>] [--media images|videos|all] [--max-files <n>] [--video-sample-rate <n>]`
-- `index update [--path <remote-path>] [--media images|videos|all] [--max-files <n>] [--video-sample-rate <n>]`
+- `index build [--path <remote-path>] [--media images|videos|all] [--max-files <n>] [--video-sample-rate <n>] [--scratch-dir <dir>]`
+- `index update [--path <remote-path>] [--media images|videos|all] [--max-files <n>] [--video-sample-rate <n>] [--scratch-dir <dir>]`
 - `index clear --yes`
 - `files stat <path>`
 - `files mkdir <path> [--parents] [--dry-run]`

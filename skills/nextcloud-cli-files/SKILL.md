@@ -54,7 +54,8 @@ The files skill also supports reference-image search against an explicit local
 media index:
 
 ```bash
-nxc --profile personal index build --path /Projects --media all --format json
+nxc --profile personal index build --path /Projects --media all \
+  --scratch-dir /mnt/work/hermes-scratch/nxc-index --format json
 nxc --profile personal files search-image ./reference-frame.png \
   --path /Projects --media all --limit 25 --format json
 nxc --profile personal index update --path /Projects --format json
@@ -63,8 +64,11 @@ nxc --profile personal index status --format json
 
 Indexing is never implicit. Use `index clear --yes` to remove the selected
 profile's local index. Image matching uses perceptual fingerprints; video matching
-samples frames with `ffmpeg` and refines the strongest candidates around their
-coarse timestamps.
+streams remote bytes into `ffmpeg` and refines the strongest candidates around
+their coarse timestamps without caching source videos or decoded frame files.
+The scan is resumable by ETag and only prunes after a complete run. Image preview
+fallbacks are bounded to 64 MiB; `--scratch-dir` or
+`NEXTCLOUD_CLI_INDEX_SCRATCH` controls the temporary directory.
 ## Create folders
 
 Preview or create a folder:

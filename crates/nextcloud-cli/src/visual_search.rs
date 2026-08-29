@@ -1,16 +1,18 @@
 use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::fs::{self, File};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use nextcloud::{ConfigPaths, Profile, WebDavClient};
 use nextcloud_index::{
     FrameFingerprint, IndexDatabase, IndexedFile, IndexedFrame, MediaKind, VisualMatch,
-    fingerprint_image_bytes, fingerprint_image_file, index_path, media_kind, remove_index,
+    fingerprint_image_bytes, fingerprint_image_file, fingerprint_rgb8, index_path, media_kind,
+    remove_index,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
-use tempfile::{NamedTempFile, TempDir};
+use tempfile::NamedTempFile;
 
 use crate::commands::IndexMedia;
 use crate::error::{CliError, CliResult};
@@ -21,6 +23,7 @@ pub struct IndexOptions {
     pub media: IndexMedia,
     pub max_files: u32,
     pub video_sample_rate: u32,
+    pub scratch_dir: Option<PathBuf>,
     pub update_only: bool,
 }
 
@@ -45,6 +48,8 @@ struct IndexRunOutput {
     pruned_files: u64,
     file_count: u64,
     frame_count: u64,
+    streaming: bool,
+    scratch_limit_bytes: u64,
 }
 
 pub async fn index_status(paths: &ConfigPaths, profile: &Profile) -> CliResult<Value> {
@@ -102,66 +107,87 @@ pub async fn build_index(
             profile: profile.name.clone(),
         });
     }
+    let scratch_dir = options
+        .scratch_dir
+        .clone()
+        .unwrap_or_else(|| paths.cache_dir.join("index-scratch"));
+    ensure_scratch_directory(&scratch_dir)?;
     let mut database = IndexDatabase::open(&path)?;
-    let entries = webdav.walk(&scope).await?;
-    let selected_entries: Vec<_> = entries
-        .into_iter()
-        .filter(|entry| {
-            media_kind(entry.content_type.as_deref(), &entry.path)
-                .is_some_and(|kind| includes_kind(options.media, kind))
-        })
-        .collect();
-    if selected_entries.len() > options.max_files as usize {
-        return Err(CliError::IndexLimitExceeded {
-            limit: options.max_files,
-        });
-    }
-
-    let mut seen_file_ids = HashSet::new();
+    let run_id = database.begin_run();
+    let mut pending_directories = vec![scope.clone()];
+    let mut visited_directories = HashSet::new();
+    let mut scanned_files = 0_u64;
     let mut indexed_files = 0_u64;
     let mut skipped_files = 0_u64;
-    for entry in &selected_entries {
-        let kind = media_kind(entry.content_type.as_deref(), &entry.path).expect("filtered media");
-        let file_id = entry
-            .file_id
-            .clone()
-            .unwrap_or_else(|| format!("path:{}", entry.path));
-        let indexed_file = IndexedFile {
-            file_id: file_id.clone(),
-            path: entry.path.clone(),
-            name: entry.name.clone(),
-            kind,
-            mime_type: entry.content_type.clone(),
-            size: entry.size,
-            etag: entry.etag.clone(),
-            modified_at: entry.modified_at.clone(),
-        };
-        let state = database.upsert_file(&indexed_file)?;
-        seen_file_ids.insert(file_id.clone());
-        if state.unchanged {
-            skipped_files += 1;
+
+    while let Some(directory) = pending_directories.pop() {
+        if !visited_directories.insert(directory.clone()) {
             continue;
         }
+        for entry in webdav.list(&directory).await? {
+            if entry.is_dir {
+                pending_directories.push(entry.path);
+                continue;
+            }
+            let Some(kind) = media_kind(entry.content_type.as_deref(), &entry.path)
+                .filter(|kind| includes_kind(options.media, *kind))
+            else {
+                continue;
+            };
+            scanned_files += 1;
+            if scanned_files > u64::from(options.max_files) {
+                return Err(CliError::IndexLimitExceeded {
+                    limit: options.max_files,
+                });
+            }
 
-        let frames = match kind {
-            MediaKind::Image => {
-                let fingerprint = fingerprint_remote_image(webdav, entry).await?;
-                vec![IndexedFrame {
-                    timestamp_ms: 0,
-                    fingerprint,
-                }]
+            let file_id = entry
+                .file_id
+                .clone()
+                .unwrap_or_else(|| format!("path:{}", entry.path));
+            let indexed_file = IndexedFile {
+                file_id: file_id.clone(),
+                path: entry.path.clone(),
+                name: entry.name.clone(),
+                kind,
+                mime_type: entry.content_type.clone(),
+                size: entry.size,
+                etag: entry.etag.clone(),
+                modified_at: entry.modified_at.clone(),
+            };
+            let state = database.upsert_file_seen(&indexed_file, run_id)?;
+            if state.unchanged {
+                skipped_files += 1;
+                continue;
             }
-            MediaKind::Video => {
-                let temporary = download_to_temp(webdav, &entry.path).await?;
-                sample_video_frames(temporary.path(), options.video_sample_rate)?
-            }
-        };
-        database.replace_frames(&file_id, &frames)?;
-        indexed_files += 1;
+
+            let frames = match kind {
+                MediaKind::Image => {
+                    let fingerprint =
+                        fingerprint_remote_image(webdav, &entry, &scratch_dir).await?;
+                    vec![IndexedFrame {
+                        timestamp_ms: 0,
+                        fingerprint,
+                    }]
+                }
+                MediaKind::Video => {
+                    sample_remote_video_frames(
+                        webdav,
+                        &entry.path,
+                        0.0,
+                        None,
+                        options.video_sample_rate,
+                    )
+                    .await?
+                }
+            };
+            database.replace_frames(&file_id, &frames)?;
+            indexed_files += 1;
+        }
     }
 
     let pruned_files = if options.media == IndexMedia::All {
-        database.prune_missing_under(&scope, &seen_file_ids)?
+        database.prune_missing_under(&scope, run_id)?
     } else {
         0
     };
@@ -173,12 +199,14 @@ pub async fn build_index(
         media: media_label(options.media).to_owned(),
         backend: "local_media_index",
         index_path: path,
-        scanned_files: selected_entries.len() as u64,
+        scanned_files,
         indexed_files,
         skipped_files,
         pruned_files,
         file_count: status.file_count,
         frame_count: status.frame_count,
+        streaming: true,
+        scratch_limit_bytes: MAX_IMAGE_FALLBACK_BYTES,
     })?)
 }
 
@@ -263,49 +291,221 @@ pub async fn search_image(
     }))
 }
 
+const VIDEO_FRAME_WIDTH: u32 = 320;
+const VIDEO_FRAME_HEIGHT: u32 = 320;
+const MAX_IMAGE_FALLBACK_BYTES: u64 = 64 * 1024 * 1024;
+
 async fn fingerprint_remote_image(
     webdav: &WebDavClient,
     entry: &nextcloud::WebDavEntry,
+    scratch_dir: &Path,
 ) -> CliResult<FrameFingerprint> {
     if let Some(file_id) = entry.file_id.as_deref()
-        && let Ok(preview) = webdav.preview(file_id, 320, 320).await
+        && let Ok(preview) = webdav
+            .preview(file_id, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT)
+            .await
+        && preview.len() <= usize::try_from(MAX_IMAGE_FALLBACK_BYTES).unwrap_or(usize::MAX)
         && let Ok(fingerprint) = fingerprint_image_bytes(&preview, &entry.path)
     {
         return Ok(fingerprint);
     }
-    let bytes = webdav.download(&entry.path).await?;
-    Ok(fingerprint_image_bytes(&bytes, &entry.path)?)
-}
+    if entry
+        .size
+        .is_some_and(|size| size > MAX_IMAGE_FALLBACK_BYTES)
+    {
+        return Err(CliError::IndexScratchLimitExceeded {
+            limit: MAX_IMAGE_FALLBACK_BYTES,
+        });
+    }
 
-async fn download_to_temp(webdav: &WebDavClient, path: &str) -> CliResult<NamedTempFile> {
-    let mut temporary = NamedTempFile::new().map_err(|source| CliError::VideoExtractionFailed {
-        message: format!("failed to create temporary video file: {source}"),
-    })?;
-    webdav
-        .download_to_writer(path, temporary.as_file_mut())
-        .await?;
+    let mut temporary =
+        NamedTempFile::new_in(scratch_dir).map_err(|source| CliError::IndexScratchUnavailable {
+            path: scratch_dir.to_path_buf(),
+            message: source.to_string(),
+        })?;
+    let mut writer = BoundedFileWriter::new(temporary.as_file_mut(), MAX_IMAGE_FALLBACK_BYTES);
+    let downloaded = webdav.download_to_writer(&entry.path, &mut writer).await;
+    if writer.exceeded {
+        return Err(CliError::IndexScratchLimitExceeded {
+            limit: MAX_IMAGE_FALLBACK_BYTES,
+        });
+    }
+    downloaded?;
     temporary
         .as_file_mut()
         .sync_all()
-        .map_err(|source| CliError::VideoExtractionFailed {
-            message: format!("failed to flush temporary video file: {source}"),
+        .map_err(|source| CliError::IndexScratchUnavailable {
+            path: scratch_dir.to_path_buf(),
+            message: source.to_string(),
         })?;
-    Ok(temporary)
+    Ok(fingerprint_image_file(temporary.path())?)
 }
 
+fn ensure_scratch_directory(path: &Path) -> CliResult<()> {
+    fs::create_dir_all(path).map_err(|source| CliError::IndexScratchUnavailable {
+        path: path.to_path_buf(),
+        message: source.to_string(),
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|source| {
+            CliError::IndexScratchUnavailable {
+                path: path.to_path_buf(),
+                message: source.to_string(),
+            }
+        })?;
+    }
+    Ok(())
+}
+
+struct BoundedFileWriter<'a> {
+    file: &'a mut File,
+    written: u64,
+    limit: u64,
+    exceeded: bool,
+}
+
+impl<'a> BoundedFileWriter<'a> {
+    fn new(file: &'a mut File, limit: u64) -> Self {
+        Self {
+            file,
+            written: 0,
+            limit,
+            exceeded: false,
+        }
+    }
+}
+
+impl Write for BoundedFileWriter<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let length = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if self.written.saturating_add(length) > self.limit {
+            self.exceeded = true;
+            return Err(io::Error::other("bounded index scratch limit exceeded"));
+        }
+        let written = self.file.write(bytes)?;
+        self.written = self.written.saturating_add(written as u64);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
+    }
+}
+
+async fn sample_remote_video_frames(
+    webdav: &WebDavClient,
+    path: &str,
+    start_seconds: f64,
+    duration_seconds: Option<f64>,
+    frames_per_second: u32,
+) -> CliResult<Vec<IndexedFrame>> {
+    if Command::new("ffmpeg").arg("-version").output().is_err() {
+        return Err(CliError::VideoToolUnavailable);
+    }
+
+    let filter = format!(
+        "fps={frames_per_second},scale={VIDEO_FRAME_WIDTH}:{VIDEO_FRAME_HEIGHT}:force_original_aspect_ratio=decrease,pad={VIDEO_FRAME_WIDTH}:{VIDEO_FRAME_HEIGHT}:(ow-iw)/2:(oh-ih)/2"
+    );
+    let mut command = Command::new("ffmpeg");
+    command
+        .args(["-hide_banner", "-loglevel", "error", "-nostdin"])
+        .arg("-i")
+        .arg("pipe:0");
+    if start_seconds > 0.0 {
+        command.args(["-ss", &format!("{start_seconds:.3}")]);
+    }
+    if let Some(duration_seconds) = duration_seconds {
+        command.args(["-t", &format!("{duration_seconds:.3}")]);
+    }
+    let mut child = command
+        .args([
+            "-vf", &filter, "-pix_fmt", "rgb24", "-f", "rawvideo", "-vsync", "0", "pipe:1",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|source| CliError::VideoExtractionFailed {
+            message: format!("failed to launch ffmpeg: {source}"),
+        })?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| CliError::VideoExtractionFailed {
+            message: "ffmpeg did not expose stdin".to_owned(),
+        })?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| CliError::VideoExtractionFailed {
+            message: "ffmpeg did not expose stdout".to_owned(),
+        })?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| CliError::VideoExtractionFailed {
+            message: "ffmpeg did not expose stderr".to_owned(),
+        })?;
+
+    let frame_reader =
+        std::thread::spawn(move || read_raw_video_frames(stdout, start_seconds, frames_per_second));
+    let stderr_reader = std::thread::spawn(move || {
+        let mut stderr = stderr.take(64 * 1024);
+        let mut bytes = Vec::new();
+        let _ = stderr.read_to_end(&mut bytes);
+        bytes
+    });
+    let webdav = webdav.clone();
+    let path = path.to_owned();
+    let download_task = tokio::spawn(async move {
+        let result = webdav.download_to_writer(&path, &mut stdin).await;
+        drop(stdin);
+        result
+    });
+
+    let download_result =
+        download_task
+            .await
+            .map_err(|source| CliError::VideoExtractionFailed {
+                message: format!("remote video download task failed: {source}"),
+            })?;
+    if download_result.is_err() {
+        let _ = child.kill();
+    }
+    let frames_result = frame_reader
+        .join()
+        .map_err(|_| CliError::VideoExtractionFailed {
+            message: "video frame reader panicked".to_owned(),
+        })?;
+    let stderr = stderr_reader.join().unwrap_or_default();
+    let status = child
+        .wait()
+        .map_err(|source| CliError::VideoExtractionFailed {
+            message: format!("failed to wait for ffmpeg: {source}"),
+        })?;
+
+    download_result?;
+    if !status.success() {
+        let message = String::from_utf8_lossy(&stderr).trim().to_owned();
+        return Err(CliError::VideoExtractionFailed {
+            message: if message.is_empty() {
+                format!("ffmpeg exited with status {status}")
+            } else {
+                message
+            },
+        });
+    }
+    frames_result
+}
+
+#[cfg(test)]
 fn sample_video_frames(path: &Path, frames_per_second: u32) -> CliResult<Vec<IndexedFrame>> {
     extract_video_frames(path, 0.0, None, frames_per_second)
 }
 
-fn refine_video_frames(
-    path: &Path,
-    center_seconds: f64,
-    frames_per_second: u32,
-) -> CliResult<Vec<IndexedFrame>> {
-    let start = (center_seconds - 1.5).max(0.0);
-    extract_video_frames(path, start, Some(3.0), frames_per_second)
-}
-
+#[cfg(test)]
 fn extract_video_frames(
     input: &Path,
     start_seconds: f64,
@@ -315,12 +515,9 @@ fn extract_video_frames(
     if Command::new("ffmpeg").arg("-version").output().is_err() {
         return Err(CliError::VideoToolUnavailable);
     }
-    let temporary = TempDir::new().map_err(|source| CliError::VideoExtractionFailed {
-        message: format!("failed to create frame cache: {source}"),
-    })?;
-    let pattern = temporary.path().join("frame-%08d.jpg");
-    let filter =
-        format!("fps={frames_per_second},scale=320:320:force_original_aspect_ratio=decrease");
+    let filter = format!(
+        "fps={frames_per_second},scale={VIDEO_FRAME_WIDTH}:{VIDEO_FRAME_HEIGHT}:force_original_aspect_ratio=decrease,pad={VIDEO_FRAME_WIDTH}:{VIDEO_FRAME_HEIGHT}:(ow-iw)/2:(oh-ih)/2"
+    );
     let mut command = Command::new("ffmpeg");
     command
         .args(["-hide_banner", "-loglevel", "error", "-nostdin"])
@@ -330,53 +527,71 @@ fn extract_video_frames(
     if let Some(duration_seconds) = duration_seconds {
         command.args(["-t", &format!("{duration_seconds:.3}")]);
     }
-    let output = command
-        .args(["-vf", &filter, "-q:v", "4", "-vsync", "0"])
-        .arg(&pattern)
-        .output()
+    let mut child = command
+        .args([
+            "-vf", &filter, "-pix_fmt", "rgb24", "-f", "rawvideo", "-vsync", "0", "pipe:1",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
         .map_err(|source| CliError::VideoExtractionFailed {
             message: format!("failed to launch ffmpeg: {source}"),
         })?;
-    if !output.status.success() {
-        let message = String::from_utf8_lossy(&output.stderr).trim().to_owned();
-        return Err(CliError::VideoExtractionFailed {
-            message: if message.is_empty() {
-                format!("ffmpeg exited with status {}", output.status)
-            } else {
-                message
-            },
-        });
-    }
-
-    let mut frame_paths = Vec::new();
-    for entry in
-        fs::read_dir(temporary.path()).map_err(|source| CliError::VideoExtractionFailed {
-            message: format!("failed to read extracted frames: {source}"),
-        })?
-    {
-        let entry = entry.map_err(|source| CliError::VideoExtractionFailed {
-            message: format!("failed to inspect extracted frame: {source}"),
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| CliError::VideoExtractionFailed {
+            message: "ffmpeg did not expose stdout".to_owned(),
         })?;
-        if entry
-            .path()
-            .extension()
-            .and_then(|extension| extension.to_str())
-            == Some("jpg")
-        {
-            frame_paths.push(entry.path());
-        }
+    let frames = read_raw_video_frames(stdout, start_seconds, frames_per_second);
+    if frames.is_err() {
+        let _ = child.kill();
     }
-    frame_paths.sort();
-
-    let mut frames = Vec::with_capacity(frame_paths.len());
-    for (index, frame_path) in frame_paths.iter().enumerate() {
-        let fingerprint = fingerprint_image_file(frame_path)?;
-        let timestamp_ms =
-            ((start_seconds + index as f64 / frames_per_second as f64) * 1000.0).round() as u64;
-        frames.push(IndexedFrame {
-            timestamp_ms,
-            fingerprint,
+    let status = child
+        .wait()
+        .map_err(|source| CliError::VideoExtractionFailed {
+            message: format!("failed to wait for ffmpeg: {source}"),
+        })?;
+    if !status.success() {
+        return Err(CliError::VideoExtractionFailed {
+            message: format!("ffmpeg exited with status {status}"),
         });
+    }
+    frames
+}
+
+fn read_raw_video_frames<R: Read>(
+    mut stdout: R,
+    start_seconds: f64,
+    frames_per_second: u32,
+) -> CliResult<Vec<IndexedFrame>> {
+    let frame_size = (VIDEO_FRAME_WIDTH * VIDEO_FRAME_HEIGHT * 3) as usize;
+    let mut buffer = vec![0_u8; frame_size];
+    let mut frames = Vec::new();
+    loop {
+        match stdout.read_exact(&mut buffer) {
+            Ok(()) => {
+                let fingerprint = fingerprint_rgb8(
+                    &buffer,
+                    VIDEO_FRAME_WIDTH,
+                    VIDEO_FRAME_HEIGHT,
+                    "ffmpeg raw frame",
+                )?;
+                let timestamp_ms =
+                    ((start_seconds + frames.len() as f64 / frames_per_second as f64) * 1000.0)
+                        .round() as u64;
+                frames.push(IndexedFrame {
+                    timestamp_ms,
+                    fingerprint,
+                });
+            }
+            Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => break,
+            Err(source) => {
+                return Err(CliError::VideoExtractionFailed {
+                    message: format!("failed to read ffmpeg frames: {source}"),
+                });
+            }
+        }
     }
     if frames.is_empty() {
         return Err(CliError::VideoExtractionFailed {
@@ -391,9 +606,15 @@ async fn refine_video_match(
     candidate: &VisualMatch,
     query: &FrameFingerprint,
 ) -> CliResult<VisualMatch> {
-    let temporary = download_to_temp(webdav, &candidate.path).await?;
     let center = candidate.timestamp_seconds.unwrap_or_default();
-    let frames = refine_video_frames(temporary.path(), center, 10)?;
+    let frames = sample_remote_video_frames(
+        webdav,
+        &candidate.path,
+        (center - 1.5).max(0.0),
+        Some(3.0),
+        10,
+    )
+    .await?;
     let Some(best) = frames.into_iter().min_by(|left, right| {
         let left_score = nextcloud_index::compare_fingerprints(query, &left.fingerprint);
         let right_score = nextcloud_index::compare_fingerprints(query, &right.fingerprint);
@@ -442,6 +663,7 @@ fn matches_scope(path: &str, scope: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn scope_matching_does_not_match_sibling_prefixes() {
@@ -455,6 +677,21 @@ mod tests {
         assert_eq!(selected_kind(IndexMedia::Images), Some(MediaKind::Image));
         assert!(includes_kind(IndexMedia::All, MediaKind::Video));
         assert!(!includes_kind(IndexMedia::Images, MediaKind::Video));
+    }
+
+    #[test]
+    fn bounded_scratch_writer_rejects_bytes_after_limit() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let path = temporary.path().join("fallback.bin");
+        let mut file = File::create(path).expect("scratch file");
+        let mut writer = BoundedFileWriter::new(&mut file, 4);
+
+        writer.write_all(b"1234").expect("within scratch limit");
+        let error = writer
+            .write_all(b"5")
+            .expect_err("limit should reject the write");
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        assert!(writer.exceeded);
     }
 
     #[test]

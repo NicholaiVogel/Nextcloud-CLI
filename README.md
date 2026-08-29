@@ -93,7 +93,8 @@ For SSH and headless machines, use the app-password setup flow documented in
 To search by visual similarity, build the explicit local index first:
 
 ```bash
-nxc --profile personal index build --path /Projects --media all --format json
+nxc --profile personal index build --path /Projects --media all \
+  --scratch-dir /mnt/work/hermes-scratch/nxc-index --format json
 nxc --profile personal files search-image ./reference-frame.png \
   --path /Projects --media all --format json
 ```
