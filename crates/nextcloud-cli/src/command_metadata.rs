@@ -143,6 +143,21 @@ pub fn command_schema() -> CommandSchema {
                 "FilesDownloadResult",
             ),
             stable(
+                "files move",
+                "Move a remote Nextcloud file or folder through WebDAV.",
+                "FilesTransferResult",
+            ),
+            stable(
+                "files rename",
+                "Rename a remote Nextcloud file or folder within its collection.",
+                "FilesTransferResult",
+            ),
+            stable(
+                "files copy",
+                "Copy a remote Nextcloud file or folder through WebDAV.",
+                "FilesTransferResult",
+            ),
+            stable(
                 "files delete",
                 "Delete a remote Nextcloud path through WebDAV with explicit confirmation.",
                 "FilesDeleteResult",

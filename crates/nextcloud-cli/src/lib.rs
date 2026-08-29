@@ -869,6 +869,12 @@ async fn handle_files(
     let webdav = WebDavClient::new(client, profile.username.clone());
     let profile_name = profile.name.clone();
     let server = profile.server.to_string();
+    let transfer_context = FileTransferContext {
+        webdav: &webdav,
+        profile: &profile_name,
+        server: &server,
+        store,
+    };
 
     match command {
         FilesCommand::List(args) => {
@@ -1074,6 +1080,46 @@ async fn handle_files(
                 overwritten: args.overwrite && existed_before,
             })
         }
+        FilesCommand::Move(args) => {
+            let source = nextcloud::webdav::normalize_remote_path(&args.from)?;
+            let destination = nextcloud::webdav::normalize_remote_path(&args.to)?;
+            handle_file_transfer(
+                "move",
+                source,
+                destination,
+                args.overwrite,
+                args.dry_run,
+                &transfer_context,
+            )
+            .await
+        }
+        FilesCommand::Rename(args) => {
+            let source = nextcloud::webdav::normalize_remote_path(&args.path)?;
+            nextcloud::webdav::reject_root_path(&source)?;
+            let destination = renamed_remote_path(&source, &args.new_name)?;
+            handle_file_transfer(
+                "rename",
+                source,
+                destination,
+                args.overwrite,
+                args.dry_run,
+                &transfer_context,
+            )
+            .await
+        }
+        FilesCommand::Copy(args) => {
+            let source = nextcloud::webdav::normalize_remote_path(&args.from)?;
+            let destination = nextcloud::webdav::normalize_remote_path(&args.to)?;
+            handle_file_transfer(
+                "copy",
+                source,
+                destination,
+                args.overwrite,
+                args.dry_run,
+                &transfer_context,
+            )
+            .await
+        }
         FilesCommand::Delete(args) => {
             let path = nextcloud::webdav::normalize_remote_path(&args.path)?;
             nextcloud::webdav::reject_root_path(&path)?;
@@ -1108,6 +1154,103 @@ async fn handle_files(
             })
         }
     }
+}
+
+async fn handle_file_transfer(
+    operation: &str,
+    source: String,
+    destination: String,
+    overwrite: bool,
+    dry_run: bool,
+    context: &FileTransferContext<'_>,
+) -> CliResult<Value> {
+    nextcloud::webdav::reject_root_path(&source)?;
+    nextcloud::webdav::reject_root_path(&destination)?;
+    let source_url = context.webdav.resolved_url(&source)?.to_string();
+    let destination_url = context.webdav.resolved_url(&destination)?.to_string();
+    let (method, command) = match operation {
+        "move" | "rename" => ("MOVE", format!("files.{operation}")),
+        "copy" => ("COPY", "files.copy".to_owned()),
+        _ => unreachable!("unsupported file transfer operation"),
+    };
+
+    if !dry_run {
+        match operation {
+            "move" | "rename" => {
+                context
+                    .webdav
+                    .move_path(&source, &destination, overwrite)
+                    .await?
+            }
+            "copy" => {
+                context
+                    .webdav
+                    .copy_path(&source, &destination, overwrite)
+                    .await?
+            }
+            _ => unreachable!("unsupported file transfer operation"),
+        }
+    }
+
+    record(
+        context.store.paths(),
+        &command_executed(
+            context.profile,
+            context.server,
+            &command,
+            dry_run,
+            method,
+            "/remote.php/dav/files/{username}{remote-path}",
+            target([
+                ("source", json!(source)),
+                ("destination", json!(destination)),
+                ("source_url", json!(source_url)),
+                ("destination_url", json!(destination_url)),
+                ("overwrite", json!(overwrite)),
+            ]),
+        ),
+    );
+
+    json_value(FilesTransferOutput {
+        profile: context.profile.to_owned(),
+        server: context.server.to_owned(),
+        operation: operation.to_owned(),
+        source,
+        destination,
+        source_url,
+        destination_url,
+        dry_run,
+        completed: !dry_run,
+        overwrite,
+    })
+}
+
+struct FileTransferContext<'a> {
+    webdav: &'a WebDavClient,
+    profile: &'a str,
+    server: &'a str,
+    store: &'a ConfigStore,
+}
+
+fn renamed_remote_path(source: &str, new_name: &str) -> CliResult<String> {
+    if new_name.is_empty() || new_name == "." || new_name == ".." || new_name.contains('/') {
+        return Err(nextcloud::Error::InvalidRemotePath {
+            path: new_name.to_owned(),
+            reason: "new name must be a single non-empty path segment".to_owned(),
+        }
+        .into());
+    }
+
+    let parent = source
+        .rsplit_once('/')
+        .map(|(parent, _)| if parent.is_empty() { "/" } else { parent })
+        .unwrap_or("/");
+    let destination = if parent == "/" {
+        format!("/{new_name}")
+    } else {
+        format!("{parent}/{new_name}")
+    };
+    nextcloud::webdav::normalize_remote_path(&destination).map_err(Into::into)
 }
 
 async fn handle_index(
@@ -3151,6 +3294,20 @@ struct FilesDownloadOutput {
     bytes_written: u64,
     content_length: Option<u64>,
     overwritten: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct FilesTransferOutput {
+    profile: String,
+    server: String,
+    operation: String,
+    source: String,
+    destination: String,
+    source_url: String,
+    destination_url: String,
+    dry_run: bool,
+    completed: bool,
+    overwrite: bool,
 }
 
 #[derive(Debug, Serialize)]

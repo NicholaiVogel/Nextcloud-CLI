@@ -1,6 +1,6 @@
 ---
 name: nextcloud-cli-files
-description: Use Nextcloud CLI to list, search, inspect, create, upload, download, and safely delete files through WebDAV. Use when an agent needs file access with nxc, JSON output, path-safe operations, dry-run validation, or read/write file workflows against a configured Nextcloud profile.
+description: Use Nextcloud CLI to list, search, inspect, create, upload, download, move, rename, copy, and safely delete files through WebDAV. Use when an agent needs file access with nxc, JSON output, path-safe operations, dry-run validation, or read/write file workflows against a configured Nextcloud profile.
 ---
 
 # Nextcloud CLI files
@@ -111,6 +111,28 @@ Overwrite local files only when the user asked for it:
 ```bash
 nxc --profile personal files download /nextcloud-cli-smoke/local.txt ./local.downloaded.txt --overwrite --format json
 ```
+
+## Move, rename, and copy
+
+Preview a server-side transfer before executing it:
+
+```bash
+nxc --profile personal files move /incoming/PLATES /input/PLATES --dry-run --format json
+nxc --profile personal files copy /input/PLATES /archive/PLATES --dry-run --format json
+nxc --profile personal files rename /archive/PLATES FINAL --dry-run --format json
+```
+
+The commands send WebDAV `MOVE` or `COPY` requests. Directory transfers stay
+server-side, and `rename` keeps the destination in the source directory. Existing
+destinations are protected by default; pass `--overwrite` only when replacement
+is intended:
+
+```bash
+nxc --profile personal files move /incoming/report.md /archive/report.md --overwrite --format json
+```
+
+Dry-run output includes the resolved absolute source and destination DAV URLs and
+does not contact the server.
 
 ## Delete safely
 

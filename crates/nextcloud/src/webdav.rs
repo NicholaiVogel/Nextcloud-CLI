@@ -153,8 +153,60 @@ impl WebDavClient {
         Ok(())
     }
 
+    pub fn resolved_url(&self, remote_path: &str) -> Result<url::Url> {
+        self.client.join(&self.dav_path(remote_path)?)
+    }
+
+    pub async fn move_path(
+        &self,
+        source_path: &str,
+        destination_path: &str,
+        overwrite: bool,
+    ) -> Result<()> {
+        self.transfer(
+            Method::from_bytes(b"MOVE").expect("valid method"),
+            source_path,
+            destination_path,
+            overwrite,
+        )
+        .await
+    }
+
+    pub async fn copy_path(
+        &self,
+        source_path: &str,
+        destination_path: &str,
+        overwrite: bool,
+    ) -> Result<()> {
+        self.transfer(
+            Method::from_bytes(b"COPY").expect("valid method"),
+            source_path,
+            destination_path,
+            overwrite,
+        )
+        .await
+    }
+
     pub async fn exists(&self, remote_path: &str) -> Result<bool> {
         Ok(self.stat_if_exists(remote_path).await?.is_some())
+    }
+
+    async fn transfer(
+        &self,
+        method: Method,
+        source_path: &str,
+        destination_path: &str,
+        overwrite: bool,
+    ) -> Result<()> {
+        let source_path = normalize_remote_path(source_path)?;
+        let destination_path = normalize_remote_path(destination_path)?;
+        reject_root_path(&source_path)?;
+        reject_root_path(&destination_path)?;
+        let source_dav_path = self.dav_path(&source_path)?;
+        let destination_url = self.resolved_url(&destination_path)?;
+        self.client
+            .request_webdav_transfer(method, &source_dav_path, &destination_url, overwrite)
+            .await
     }
 
     async fn stat_if_exists(&self, path: &str) -> Result<Option<WebDavEntry>> {
@@ -818,6 +870,47 @@ mod tests {
         assert_eq!(output, b"hello");
         assert_eq!(downloaded.bytes_written, 5);
         assert_eq!(downloaded.content_length, Some(5));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn move_sends_absolute_destination_and_overwrite_header() -> Result<()> {
+        let server = OneShotServer::spawn(MockResponse::text(201, ""));
+
+        mock_webdav(server.base_url())?
+            .move_path("/incoming/PLATES", "/input/PLATES", false)
+            .await?;
+        let request = server.join();
+
+        assert_eq!(request.method, "MOVE");
+        assert_eq!(
+            request.path,
+            "/remote.php/dav/files/nicholai/incoming/PLATES"
+        );
+        assert!(request
+            .header("destination")
+            .is_some_and(|value| value.ends_with(
+                "/remote.php/dav/files/nicholai/input/PLATES"
+            )));
+        assert_eq!(request.header("overwrite"), Some("F"));
+        assert!(request.header("authorization").is_some());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn copy_sets_overwrite_header_when_requested() -> Result<()> {
+        let server = OneShotServer::spawn(MockResponse::text(204, ""));
+
+        mock_webdav(server.base_url())?
+            .copy_path("/source/report.md", "/archive/report.md", true)
+            .await?;
+        let request = server.join();
+
+        assert_eq!(request.method, "COPY");
+        assert_eq!(request.header("overwrite"), Some("T"));
+        assert!(request.header("destination").is_some_and(|value| {
+            value.ends_with("/remote.php/dav/files/nicholai/archive/report.md")
+        }));
         Ok(())
     }
 

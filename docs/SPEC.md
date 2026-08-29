@@ -73,7 +73,8 @@ Completed so far:
 - Multistatus XML parser with unit coverage.
 - Remote path normalization and segment encoding with unit coverage.
 - `files list`, `files stat`, `files mkdir --parents`, `files upload`,
-  `files download`, `files search`, and `files delete --yes`.
+  `files download`, `files move`, `files rename`, `files copy`,
+  `files search`, and `files delete --yes`.
 - `index status`, `index build`, `index update`, `index clear --yes`, and
   `files search-image` for local perceptual image/video-frame matching.
 - Profile-scoped SQLite fingerprint storage with ETag-based incremental updates
@@ -704,6 +705,9 @@ nextcloud-cli files stat <path>
 nextcloud-cli files mkdir <path> [--parents] [--dry-run]
 nextcloud-cli files upload <local> <remote> [--overwrite] [--content-type <mime>]
 nextcloud-cli files download <remote> <local> [--overwrite]
+nextcloud-cli files move <from> <to> [--overwrite] [--dry-run]
+nextcloud-cli files rename <path> <new-name> [--overwrite] [--dry-run]
+nextcloud-cli files copy <from> <to> [--overwrite] [--dry-run]
 nextcloud-cli files delete <path> [--dry-run] --yes
 nextcloud-cli update check
 ```
@@ -728,6 +732,13 @@ Implementation notes:
   `--overwrite` is passed.
 - `files download` refuses to overwrite an existing local file unless
   `--overwrite` is passed.
+- `files move` and `files copy` send WebDAV `Destination` and `Overwrite` headers.
+  The default `Overwrite: F` preserves an existing destination; pass
+  `--overwrite` to send `Overwrite: T`.
+- `files rename` is the same-collection convenience form of `files move` and
+  requires a single path-segment new name.
+- File transfer dry-runs resolve and print absolute source and destination DAV
+  URLs without sending a network request.
 - `files search` currently supports name search through DAV `SEARCH`; richer
   content/local-index search remains pending.
 - `files delete` requires `--yes` unless `--dry-run` is passed. Root deletion is
